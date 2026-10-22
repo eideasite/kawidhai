@@ -5,5 +5,5 @@ const statusLabels = { draft: 'Draft', scheduled: 'Scheduled locally', published
 
 export default function ArticleStatusTag({ status }) {
   const { t } = useLanguage()
-  return <Tag className={`status-tag status-${status || 'draft'}`}>{t(statusLabels[status] || statusLabels.draft)}</Tag>
+  return <Tag className={`status-tag status-${status || 'draft'}`} role="status">{t(statusLabels[status] || statusLabels.draft)}</Tag>
 }

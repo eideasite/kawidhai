@@ -1,31 +1,41 @@
-import { notifyAppError } from '../../services/errorNotifications.js'
 import { forwardRef, useEffect, useRef } from 'react'
 import { App } from 'antd'
-import { richTextToHtml, sanitizeRichTextHtml } from '../../utils/richText.js'
+
+import { notifyAppError } from '../../services/errorNotifications.js'
+import { richTextToHtml, richTextToPlainText, sanitizeRichTextHtml } from '../../utils/richText.js'
 import { useLanguage } from '../../context/LanguageContext.jsx'
 
 const ArticleBodyEditor = forwardRef(function ArticleBodyEditor({ value, onChange, onSelectionChange }, forwardedRef) {
   const { message } = App.useApp()
   const { t } = useLanguage()
   const localRef = useRef(null)
+  const editedRef = useRef(false)
 
   useEffect(() => {
     const editor = localRef.current
     if (!editor || document.activeElement === editor) return
-    const safeHtml = richTextToHtml(value || '')
+    // Older saves may contain the literal result of String(an editor object).
+    // Treat that exact, content-only artifact as empty so the editable canvas
+    // opens cleanly; leave persisted data untouched until the user types.
+    const isObjectPlaceholder = typeof value === 'string' && richTextToPlainText(value).trim() === '[object Object]'
+    const safeHtml = isObjectPlaceholder ? '' : richTextToHtml(value || '')
     if (editor.innerHTML !== safeHtml) editor.innerHTML = safeHtml
   }, [value])
 
   const handleInput = (event) => {
-    // Keep typing responsive; sanitize on blur, paste boundaries, formatting, and before display.
-    onChange(event.currentTarget.innerHTML)
+    // Keep the live DOM and cursor untouched, but persist only allowlisted markup.
+    editedRef.current = true
+    onChange(sanitizeRichTextHtml(event.currentTarget.innerHTML))
   }
 
   const handleBlur = (event) => {
     const editor = event.currentTarget
     const safeHtml = sanitizeRichTextHtml(editor.innerHTML)
     if (editor.innerHTML !== safeHtml) editor.innerHTML = safeHtml
-    if (safeHtml !== (value || '')) onChange(safeHtml)
+    if (!editedRef.current && typeof value === 'string' && richTextToPlainText(value).trim() === '[object Object]') return
+    if (typeof value !== 'string' && !editedRef.current) return
+    if (safeHtml !== (typeof value === 'string' ? value : '')) onChange(safeHtml)
+    editedRef.current = false
   }
 
   const handlePaste = (event) => {

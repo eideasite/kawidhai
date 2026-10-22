@@ -1,4 +1,4 @@
-import { Button, Dropdown, Input, Layout, Select, Switch, Tooltip, Typography } from 'antd'
+import { Button, Dropdown, Input, Layout, message, Modal, Select, Switch, Tooltip, Typography } from 'antd'
 import { DownOutlined, GlobalOutlined, LockOutlined, LogoutOutlined, MenuOutlined, MoonOutlined, SettingOutlined, SunOutlined } from '@ant-design/icons'
 import { useState } from 'react'
 import { useLanguage } from '../../context/LanguageContext.jsx'
@@ -11,10 +11,23 @@ export default function AppHeader({ onOpenMenu, themeMode, onThemeChange, langua
   const isDark = themeMode === 'dark'
   const { t } = useLanguage()
   const [searchQuery, setSearchQuery] = useState('')
-  const searchGoogleAI = (value) => {
-    const query = value.trim()
-    if (!query) return
-    window.open(`https://www.google.com/ai?q=${encodeURIComponent(query)}`, '_blank', 'noopener,noreferrer')
+  const [submittedSearch, setSubmittedSearch] = useState('')
+  const [searchPromptOpen, setSearchPromptOpen] = useState(false)
+  const submitSearch = (value) => {
+    const query = (typeof value === 'string' ? value : searchQuery).trim()
+    if (!query) {
+      message.warning({ content: t('Enter a search query'), key: 'google-search-empty' })
+      return
+    }
+    if (searchPromptOpen) return
+    setSubmittedSearch(query)
+    setSearchPromptOpen(true)
+  }
+  const googleAIUrl = new URL('https://www.google.com/ai')
+  const googleSearchUrl = new URL('https://www.google.com/search')
+  if (submittedSearch) {
+    googleAIUrl.searchParams.set('q', submittedSearch)
+    googleSearchUrl.searchParams.set('q', submittedSearch)
   }
   const accountMenu = {
     items: [
@@ -38,8 +51,8 @@ export default function AppHeader({ onOpenMenu, themeMode, onThemeChange, langua
         placeholder={t('Search Google AI')}
         value={searchQuery}
         onChange={(event) => setSearchQuery(event.target.value)}
-        onSearch={searchGoogleAI}
-        enterButton={<Button type="primary"><span className="google-ai-mark" aria-hidden="true">G</span>Google AI</Button>}
+        onSearch={submitSearch}
+        enterButton={<><span className="google-ai-mark" aria-hidden="true">G</span>Google AI</>}
       />
       <div className="header-tools">
         <Typography.Text className="header-note">{t('Personal writing space')}</Typography.Text>
@@ -69,6 +82,25 @@ export default function AppHeader({ onOpenMenu, themeMode, onThemeChange, langua
           </Button>
         </Dropdown>
       </div>
+      <Modal
+        className="google-ai-personal-intelligence"
+        title={t('Open Google AI')}
+        open={searchPromptOpen}
+        onCancel={() => setSearchPromptOpen(false)}
+        footer={null}
+        centered
+        width={480}
+        destroyOnHidden
+      >
+        <p className="google-ai-personal-copy">
+          {t('Only your submitted search text is sent. Google AI opens in a new tab. If no tab opens, use Google Search in this tab. Article drafts and saved content are not included.')}
+        </p>
+        <div className="google-ai-personal-actions">
+          <Button onClick={() => setSearchPromptOpen(false)}>{t('Cancel')}</Button>
+          <Button className="google-ai-fallback" href={googleSearchUrl.toString()}>{t('Fallback: Open Google Search in this tab')}</Button>
+          <Button className="google-ai-continue" type="primary" href={googleAIUrl.toString()} target="_blank" rel="noopener noreferrer">{t('Open Google AI in a new tab')}</Button>
+        </div>
+      </Modal>
     </Header>
   )
 }

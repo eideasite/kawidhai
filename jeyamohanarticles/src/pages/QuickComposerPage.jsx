@@ -1,25 +1,28 @@
-import { notifyAppError } from '../services/errorNotifications.js'
 import { useEffect, useRef, useState } from 'react'
-import { Button, Card, Input, Modal, Popover, Space, Spin, Tooltip, Typography, message } from 'antd'
+import { Button, Card, Empty, Input, Modal, Popover, Space, Spin, Tooltip, Typography, message } from 'antd'
 import { AudioOutlined, FileTextOutlined, PictureOutlined, SmileOutlined } from '@ant-design/icons'
+
+import { notifyAppError } from '../services/errorNotifications.js'
 import { formatDate } from '../utils/formatDate.js'
 import { waitForPostingMinimum } from '../services/publishingService.js'
 import { useLanguage } from '../context/LanguageContext.jsx'
 import HighlightsSection from '../components/common/HighlightsSection.jsx'
 import ProfileAvatar from '../components/common/ProfileAvatar.jsx'
+import ArticleList from '../components/articles/ArticleList.jsx'
 
 const { TextArea } = Input
 const EMOJIS = ['🙂', '😊', '❤️', '👏', '🙏', '✨', '🌿', '💭']
 const ACCEPTED_IMAGES = ['image/png', 'image/jpeg', 'image/gif', 'image/webp']
 const MAX_IMAGE_SIZE = 4 * 1024 * 1024
 
-export default function QuickComposerPage({ profile, posts = [], highlights = [], onSaveHighlights, onCreatePost, onWriteArticle }) {
+export default function QuickComposerPage({ profile, posts = [], articles = [], highlights = [], bookmarkedIds = [], shortcutIds = [], pinnedIds = [], onToggleBookmark, onToggleShortcut, onTogglePin, onSaveHighlights, onCreatePost, onWriteArticle, onOpenArticle, onArticleAction }) {
   const { t, language } = useLanguage()
   const [open, setOpen] = useState(false)
   const [posting, setPosting] = useState(false)
   const [text, setText] = useState('')
   const [image, setImage] = useState(null)
   const [dictating, setDictating] = useState(false)
+  const [showAllPosts, setShowAllPosts] = useState(false)
   const fileInputRef = useRef(null)
   const recognitionRef = useRef(null)
 
@@ -111,6 +114,12 @@ export default function QuickComposerPage({ profile, posts = [], highlights = []
   }
 
   const emojiPicker = <div className="quick-composer-emoji-list">{EMOJIS.map((emoji) => <Button key={emoji} type="text" aria-label={`Insert ${emoji}`} onClick={() => setText((current) => `${current}${emoji}`)}>{emoji}</Button>)}</div>
+  const recentPosts = posts
+    .slice()
+    .sort((first, second) => Date.parse(second.createdAt) - Date.parse(first.createdAt))
+  const visiblePosts = showAllPosts ? recentPosts : recentPosts.slice(0, 3)
+  const shortcutArticles = shortcutIds.map((id) => articles.find((article) => article.id === id)).filter(Boolean)
+  const missingShortcutCount = shortcutIds.length - shortcutArticles.length
 
   return (
     <main className="quick-composer-page">
@@ -144,6 +153,56 @@ export default function QuickComposerPage({ profile, posts = [], highlights = []
       </div>
 
       <HighlightsSection profile={profile} highlights={highlights} onSave={onSaveHighlights} />
+
+      <section className="home-article-section" aria-labelledby="home-shortcuts-heading">
+        <div className="home-article-section-heading">
+          <Typography.Title level={4} id="home-shortcuts-heading">{t('Home Shortcuts')}</Typography.Title>
+        </div>
+        {missingShortcutCount > 0 && <Typography.Text className="home-reference-warning" type="secondary">{t('Some shortcuts point to articles that are no longer available.')}</Typography.Text>}
+        <ArticleList
+          articles={shortcutArticles}
+          filter="all"
+          onOpen={onOpenArticle}
+          bookmarkedIds={bookmarkedIds}
+          shortcutIds={shortcutIds}
+          pinnedIds={pinnedIds}
+          onToggleBookmark={onToggleBookmark}
+          onToggleShortcut={onToggleShortcut}
+          onTogglePin={onTogglePin}
+          emptyDescription={t(shortcutIds.length ? 'Saved shortcuts are unavailable.' : 'No Home Shortcuts yet')}
+        />
+      </section>
+
+      <section className="home-article-section" aria-labelledby="home-recent-posts-heading">
+        <div className="home-article-section-heading">
+          <Typography.Title level={4} id="home-recent-posts-heading">{t('Recent Posts')}</Typography.Title>
+          {recentPosts.length > 3 && <Button type="link" onClick={() => setShowAllPosts((current) => !current)}>{t(showAllPosts ? 'Show Less' : 'See More')}</Button>}
+        </div>
+        {visiblePosts.length === 0 ? <Empty className="list-empty" description={t('No posts yet')} /> : (
+          <div className="home-post-feed">
+            {visiblePosts.map((post) => (
+              <Card className="home-post-card" key={post.id}>
+                <div className="home-post-author">
+                  <ProfileAvatar profile={profile} className="quick-composer-avatar" />
+                  <div className="home-post-author-info">
+                    <Typography.Text strong>{profile.name || t('Writer')}</Typography.Text>
+                    <Typography.Text type="secondary">{formatDate(post.createdAt, { dateStyle: 'medium', timeStyle: 'short' }, language === 'ta' ? 'ta-LK' : 'en-US')} · {t('Local post')}</Typography.Text>
+                  </div>
+                </div>
+                {post.text && <div className="home-post-body">{post.text}</div>}
+                {post.image?.src && <img className="home-post-image" src={post.image.src} alt={post.image.name || t('Post image')} />}
+              </Card>
+            ))}
+          </div>
+        )}
+      </section>
+
+      <section className="home-article-section" aria-labelledby="home-articles-heading">
+        <div className="home-article-section-heading">
+          <Typography.Title level={4} id="home-articles-heading">{t('Articles')}</Typography.Title>
+        </div>
+        <ArticleList articles={articles} filter="all" onOpen={onOpenArticle} onAction={onArticleAction} bookmarkedIds={bookmarkedIds} shortcutIds={shortcutIds} pinnedIds={pinnedIds} onToggleBookmark={onToggleBookmark} onToggleShortcut={onToggleShortcut} onTogglePin={onTogglePin} />
+      </section>
 
       <Modal
         className="create-post-modal"
@@ -183,22 +242,6 @@ export default function QuickComposerPage({ profile, posts = [], highlights = []
       </Modal>
 
       <input ref={fileInputRef} className="quick-composer-file" type="file" accept={ACCEPTED_IMAGES.join(',')} onChange={handleImage} />
-
-      <section className="home-post-feed" aria-label={t('Posts')}>
-        {posts.map((post) => (
-          <Card className="home-post-card" key={post.id}>
-            <div className="home-post-author">
-              <ProfileAvatar profile={profile} className="quick-composer-avatar" />
-              <div className="home-post-author-info">
-                <Typography.Text strong>{profile.name || t('Writer')}</Typography.Text>
-                <Typography.Text type="secondary">{formatDate(post.createdAt, { dateStyle: 'medium', timeStyle: 'short' }, language === 'ta' ? 'ta-LK' : 'en-US')} · {t('Local post')}</Typography.Text>
-              </div>
-            </div>
-            {post.text && <div className="home-post-body">{post.text}</div>}
-            {post.image?.src && <img className="home-post-image" src={post.image.src} alt={post.image.name || t('Post image')} />}
-          </Card>
-        ))}
-      </section>
     </main>
   )
 }

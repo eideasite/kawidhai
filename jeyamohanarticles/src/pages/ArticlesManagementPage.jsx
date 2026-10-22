@@ -13,7 +13,7 @@ const filters = [
   { label: 'Published articles', value: 'published' },
 ]
 
-export default function ArticlesManagementPage({ articles, onCreate, onOpen, onAction }) {
+export default function ArticlesManagementPage({ articles, onCreate, onOpen, onAction, pinnedIds, onTogglePin }) {
   const [filter, setFilter] = useState('all')
   const { t } = useLanguage()
   return (
@@ -24,7 +24,7 @@ export default function ArticlesManagementPage({ articles, onCreate, onOpen, onA
       </div>
       <Card className="surface-card list-card">
         <div className="list-toolbar"><Segmented options={filters.map((item) => ({ ...item, label: t(item.label) }))} value={filter} onChange={setFilter} /></div>
-        <ArticleList articles={articles} filter={filter} onOpen={onOpen} onAction={onAction} />
+        <ArticleList articles={articles} filter={filter} onOpen={onOpen} onAction={onAction} pinnedIds={pinnedIds} onTogglePin={onTogglePin} />
       </Card>
     </div>
   )

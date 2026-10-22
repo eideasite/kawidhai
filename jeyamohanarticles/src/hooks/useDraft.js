@@ -1,8 +1,10 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
-import { saveWorkspace } from '../services/articleStorage.js'
+import { hasWorkspaceWriteConflict, saveWorkspace } from '../services/articleStorage.js'
 
 export function useDraft(workspace) {
-  const [saveStatus, setSaveStatus] = useState('saved')
+  // The initial workspace is also persisted by the debounced effect below.
+  // Keep the indicator honest until that first write succeeds.
+  const [saveStatus, setSaveStatus] = useState('saving')
   const latestWorkspace = useRef(workspace)
 
   useLayoutEffect(() => {
@@ -10,7 +12,10 @@ export function useDraft(workspace) {
   }, [workspace])
 
   useEffect(() => {
-    const timer = window.setTimeout(() => setSaveStatus(saveWorkspace(workspace) ? 'saved' : 'error'), 350)
+    const timer = window.setTimeout(() => {
+      const saved = saveWorkspace(workspace)
+      setSaveStatus(saved ? 'saved' : hasWorkspaceWriteConflict() ? 'conflict' : 'error')
+    }, 350)
     return () => window.clearTimeout(timer)
   }, [workspace])
 
@@ -24,7 +29,7 @@ export function useDraft(workspace) {
 
   const saveNow = () => {
     const saved = saveWorkspace(latestWorkspace.current)
-    setSaveStatus(saved ? 'saved' : 'error')
+    setSaveStatus(saved ? 'saved' : hasWorkspaceWriteConflict() ? 'conflict' : 'error')
     return saved
   }
   return { saveStatus, setSaveStatus, saveNow }

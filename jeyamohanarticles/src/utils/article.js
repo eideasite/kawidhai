@@ -24,18 +24,26 @@ export const createArticle = (overrides = {}) => ({
 
 import { richTextToPlainText } from './richText.js'
 
-export const getArticleTitle = (article) => article?.title?.trim() || 'தலைப்பில்லாத கட்டுரை'
+export const getArticleTitle = (article) => (typeof article?.title === 'string' ? article.title.trim() : '') || 'தலைப்பில்லாத கட்டுரை'
 
 export const getWordCount = (body = '') => {
   const text = richTextToPlainText(body)
-  return text ? text.split(/\s+/u).length : 0
+  if (!text) return 0
+  if (typeof Intl.Segmenter === 'function') {
+    return Array.from(new Intl.Segmenter(undefined, { granularity: 'word' }).segment(text))
+      .filter((segment) => segment.isWordLike).length
+  }
+  return text.split(/\s+/u).length
 }
 
 export const getReadingMinutes = (body = '') => Math.max(1, Math.ceil(getWordCount(body) / 200))
 
 export const getArticleExcerpt = (body = '', limit = 170) => {
   const text = richTextToPlainText(body).replace(/\s+/gu, ' ').trim()
-  return text.length > limit ? `${text.slice(0, limit).trimEnd()}…` : text
+  const graphemes = typeof Intl.Segmenter === 'function'
+    ? Array.from(new Intl.Segmenter(undefined, { granularity: 'grapheme' }).segment(text), (segment) => segment.segment)
+    : Array.from(text)
+  return graphemes.length > limit ? `${graphemes.slice(0, limit).join('').trimEnd()}…` : text
 }
 
 export const makeSafeFilename = (title = '') =>

@@ -14,7 +14,10 @@ import {
   OrderedListOutlined,
   PictureOutlined,
   CommentOutlined,
+  SaveOutlined,
+  RobotOutlined,
   UnorderedListOutlined,
+  UnderlineOutlined,
 } from '@ant-design/icons'
 import { useLanguage } from '../../context/LanguageContext.jsx'
 
@@ -27,6 +30,7 @@ const formatItems = [
 const formatActions = [
   { key: 'bold', label: 'Bold', icon: <BoldOutlined /> },
   { key: 'italic', label: 'Italic', icon: <ItalicOutlined /> },
+  { key: 'underline', label: 'Underline', icon: <UnderlineOutlined /> },
   { key: 'bullet', label: 'Bulleted list', icon: <UnorderedListOutlined /> },
   { key: 'number', label: 'Numbered list', icon: <OrderedListOutlined /> },
   { key: 'quote', label: 'Quote', icon: <CommentOutlined /> },
@@ -36,7 +40,7 @@ const formatActions = [
   { key: 'image', label: 'Insert image reference', icon: <PictureOutlined /> },
 ]
 
-export function EditorFormatToolbar({ onFormat }) {
+export function EditorFormatToolbar({ onFormat, activeFormats = {} }) {
   const { t } = useLanguage()
   const [activePopover, setActivePopover] = useState(null)
   const [url, setUrl] = useState('')
@@ -48,15 +52,29 @@ export function EditorFormatToolbar({ onFormat }) {
   }
 
   return (
-    <div className="editor-format-toolbar" aria-label="Article formatting">
-      <Dropdown menu={{ items: formatItems.map((item) => ({ ...item, label: t(item.label) })), onClick: ({ key }) => onFormat(key) }} trigger={['click']}>
+    <div className="editor-format-toolbar" role="toolbar" aria-label={t('Article formatting')}>
+      <Dropdown menu={{ items: formatItems.map((item) => ({ ...item, label: t(item.label) })), selectedKeys: activeFormats.block ? [activeFormats.block] : [], onClick: ({ key }) => onFormat(key) }} trigger={['click']}>
         <Button className="format-style-button" aria-label={t('Choose text style')} onMouseDown={(event) => event.preventDefault()}>
-          {t('Style')} <DownOutlined />
+          {t(formatItems.find((item) => item.key === activeFormats.block)?.label || 'Style')} <DownOutlined />
         </Button>
       </Dropdown>
+      <div className="format-size-controls" role="group" aria-label={t('Selected text size')}>
+        <Tooltip title={t('Decrease selected text size')}>
+          <Button className="format-size-button" aria-label={t('Decrease selected text size')} disabled={!activeFormats.hasSelection || activeFormats.fontSize === 0} onMouseDown={(event) => event.preventDefault()} onClick={() => onFormat('fontDecrease')}>
+            <span aria-hidden="true">A−</span>
+          </Button>
+        </Tooltip>
+        <Tooltip title={t('Increase selected text size')}>
+          <Button className="format-size-button" aria-label={t('Increase selected text size')} disabled={!activeFormats.hasSelection || activeFormats.fontSize === 4} onMouseDown={(event) => event.preventDefault()} onClick={() => onFormat('fontIncrease')}>
+            <span aria-hidden="true">A+</span>
+          </Button>
+        </Tooltip>
+      </div>
       {formatActions.map(({ key, label, icon }) => {
+        const isToggle = ['bold', 'italic', 'underline', 'bullet', 'number', 'quote', 'codeblock'].includes(key)
+        const isActive = isToggle && activeFormats[key] === true
         const action = (
-          <Button className="format-icon-button" aria-label={t(label)} onMouseDown={(event) => event.preventDefault()} onClick={() => {
+          <Button className={`format-icon-button${isActive ? ' is-active' : ''}`} aria-label={t(label)} aria-pressed={isToggle ? isActive : undefined} onMouseDown={(event) => event.preventDefault()} onClick={() => {
             if (key === 'link' || key === 'image') { setUrl(''); setActivePopover(key) }
             else onFormat(key)
           }}>
@@ -88,7 +106,7 @@ export function EditorFormatToolbar({ onFormat }) {
   )
 }
 
-export default function EditorToolbar({ article, onOpenSeo, onManage, onDiscard, onBackHome, onPreview, onDownloadPdf }) {
+export default function EditorToolbar({ article, onOpenSeo, onManage, onDiscard, onBackHome, onSaveDraft, onPreview, onDownloadPdf, onAskGemini }) {
   const { t } = useLanguage()
   const manageItems = [
     { key: 'articles', label: t('Articles Management') },
@@ -103,9 +121,11 @@ export default function EditorToolbar({ article, onOpenSeo, onManage, onDiscard,
         <Typography.Paragraph>{t('Write and edit your article. Your draft is saved in this browser.')}</Typography.Paragraph>
       </div>
       <div className="editor-flow-actions">
-        <Button type="text" className="editor-back-home-button" icon={<ArrowLeftOutlined />} onClick={onBackHome}>{t('Back to home')}</Button>
+        <Button type="text" className="editor-back-home-button" icon={<ArrowLeftOutlined />} onClick={onBackHome}>{t('Back')}</Button>
+        <Button className="editor-save-draft-button" icon={<SaveOutlined />} onClick={onSaveDraft}>{t('Save Draft')}</Button>
         <Button className="editor-preview-button" icon={<EyeOutlined />} onClick={onPreview}>{t('Preview')}</Button>
-        <Button className="editor-pdf-button" icon={<FilePdfOutlined />} onClick={onDownloadPdf}>{t('Save as PDF')}</Button>
+        <Button className="editor-gemini-button" icon={<RobotOutlined />} onClick={onAskGemini}>{t('Ask Gemini')}</Button>
+        <Button className="editor-pdf-button" icon={<FilePdfOutlined />} title={t('Choose Save as PDF in the browser print dialog.')} onClick={onDownloadPdf}>{t('Print / Save as PDF')}</Button>
         <Dropdown
           menu={{
             items: manageItems,

@@ -1,7 +1,7 @@
 import { notifyAppError } from '../../services/errorNotifications.js'
 import { useRef, useState } from 'react'
 import { Button, Empty, Input, Modal, Popconfirm, Space, Typography, message } from 'antd'
-import { ArrowLeftOutlined, DeleteOutlined, EditOutlined, LeftOutlined, PlusOutlined, RightOutlined, UploadOutlined } from '@ant-design/icons'
+import { ArrowLeftOutlined, CheckOutlined, DeleteOutlined, EditOutlined, LeftOutlined, PictureOutlined, PlusOutlined, RightOutlined, StarOutlined, UploadOutlined } from '@ant-design/icons'
 import { createHighlightCollection } from '../../services/highlightStorage.js'
 import { formatDate } from '../../utils/formatDate.js'
 import { useLanguage } from '../../context/LanguageContext.jsx'
@@ -10,6 +10,42 @@ import ProfileAvatar from './ProfileAvatar.jsx'
 const MAX_IMAGE_SIZE = 4 * 1024 * 1024
 const MAX_ITEMS = 8
 const ACCEPTED_IMAGES = ['image/png', 'image/jpeg', 'image/gif', 'image/webp']
+const MAX_STORED_IMAGE_EDGE = 1280
+
+function HighlightImage({ src, alt, className, fallbackLabel }) {
+  const [failedSrc, setFailedSrc] = useState(null)
+  if (!src || failedSrc === src) {
+    return <span className={`${className} highlight-image-fallback`} role="img" aria-label={fallbackLabel}>
+      <PictureOutlined aria-hidden="true" />
+      <span>{fallbackLabel}</span>
+    </span>
+  }
+  return <img className={className} src={src} alt={alt} onError={() => setFailedSrc(src)} />
+}
+
+function compactImage(image) {
+  if (!/^data:image\/(png|jpeg|webp);/i.test(image.src)) return Promise.resolve(image)
+  return new Promise((resolve) => {
+    const source = new Image()
+    source.onload = () => {
+      try {
+        const scale = Math.min(1, MAX_STORED_IMAGE_EDGE / Math.max(source.naturalWidth, source.naturalHeight))
+        const canvas = document.createElement('canvas')
+        canvas.width = Math.max(1, Math.round(source.naturalWidth * scale))
+        canvas.height = Math.max(1, Math.round(source.naturalHeight * scale))
+        const context = canvas.getContext('2d')
+        if (!context) return resolve(image)
+        context.drawImage(source, 0, 0, canvas.width, canvas.height)
+        const src = canvas.toDataURL('image/webp', 0.78)
+        resolve(src.length < image.src.length ? { ...image, src } : image)
+      } catch {
+        resolve(image)
+      }
+    }
+    source.onerror = () => resolve(image)
+    source.src = image.src
+  })
+}
 
 function readImage(file) {
   return new Promise((resolve, reject) => {
@@ -27,6 +63,7 @@ export default function HighlightsSection({ profile, highlights = [], onSave }) 
   const [view, setView] = useState(null)
   const [editing, setEditing] = useState(null)
   const [readingImages, setReadingImages] = useState(false)
+  const [savingCollection, setSavingCollection] = useState(false)
 
   const startNewCollection = () => {
     setEditing(createHighlightCollection())
@@ -34,11 +71,12 @@ export default function HighlightsSection({ profile, highlights = [], onSave }) 
   }
 
   const beginEdit = (collection) => {
-    setEditing({ ...collection, items: [...collection.items] })
+    setEditing({ ...collection, items: [...collection.items], articleHighlights: [...(collection.articleHighlights || [])] })
     setView('edit')
   }
 
   const addImages = async (event) => {
+    if (savingCollection) return
     const files = Array.from(event.target.files || [])
     event.target.value = ''
     if (!files.length) return
@@ -60,22 +98,39 @@ export default function HighlightsSection({ profile, highlights = [], onSave }) 
     }
   }
 
-  const saveCollection = () => {
-    const cleaned = { ...editing, title: editing.title.trim(), updatedAt: new Date().toISOString() }
-    const exists = highlights.some((item) => item.id === cleaned.id)
-    const next = exists
-      ? highlights.map((item) => item.id === cleaned.id ? cleaned : item)
-      : [cleaned, ...highlights]
+  const saveCollection = async () => {
+    if (!editing || savingCollection || readingImages || !editing.title.trim() || !editing.items.length || editing.items.length > MAX_ITEMS) return
+    setSavingCollection(true)
+    try {
+      const compacted = await Promise.all(editing.items.map(compactImage))
+      const cleaned = { ...editing, title: editing.title.trim(), items: compacted, updatedAt: new Date().toISOString() }
+      const exists = highlights.some((item) => item.id === cleaned.id)
+      const next = exists
+        ? highlights.map((item) => item.id === cleaned.id ? cleaned : item)
+        : [cleaned, ...highlights]
+      if (!onSave(next)) return
+      message.success(t('Saved in this browser'))
+      setEditing(null)
+      setView('manage')
+    } finally {
+      setSavingCollection(false)
+    }
+  }
+
+  const deleteCollection = () => {
+    if (savingCollection) return
+    const next = highlights.filter((item) => item.id !== editing.id)
     if (!onSave(next)) return
     setEditing(null)
     setView('manage')
   }
 
-  const deleteCollection = () => {
-    const next = highlights.filter((item) => item.id !== editing.id)
-    if (!onSave(next)) return
-    setEditing(null)
-    setView('manage')
+  const chooseCover = (index) => {
+    setEditing((current) => {
+      if (!current || index === 0 || !current.items[index]) return current
+      const cover = current.items[index]
+      return { ...current, items: [cover, ...current.items.filter((_, itemIndex) => itemIndex !== index)] }
+    })
   }
 
   const closeDialog = () => {
@@ -89,7 +144,7 @@ export default function HighlightsSection({ profile, highlights = [], onSave }) 
 
   const moveCarousel = (direction) => carouselRef.current?.scrollBy({ left: direction * 210, behavior: 'smooth' })
   const modalTitle = view === 'edit'
-    ? <Space><Button className="highlight-back-button" type="text" aria-label={t('Back to highlights')} icon={<ArrowLeftOutlined />} onClick={closeDialog} /><span>{t('Edit highlight collection')}</span></Space>
+    ? <Space><Button className="highlight-back-button" type="text" disabled={savingCollection} aria-label={t('Back to highlights')} icon={<ArrowLeftOutlined />} onClick={closeDialog} /><span>{t('Edit highlight collection')}</span></Space>
     : t('Edit highlights')
 
   return (
@@ -105,7 +160,7 @@ export default function HighlightsSection({ profile, highlights = [], onSave }) 
         <div className="highlights-carousel" ref={carouselRef}>
           {highlights.map((collection) => (
             <button className="highlight-tile" key={collection.id} type="button" onClick={() => beginEdit(collection)} aria-label={`${t('Edit')} ${collection.title}`}>
-              <span className="highlight-cover">{collection.items[0] && <img src={collection.items[0].src} alt="" />}</span>
+              <span className="highlight-cover"><HighlightImage className="highlight-cover-image" src={collection.items[0]?.src} alt="" fallbackLabel={t('Photo unavailable')} /></span>
               <span className="highlight-title">{collection.title}</span>
             </button>
           ))}
@@ -119,11 +174,11 @@ export default function HighlightsSection({ profile, highlights = [], onSave }) 
         className="highlights-modal"
         title={modalTitle}
         open={Boolean(view)}
-        onCancel={closeDialog}
+        onCancel={() => { if (!savingCollection) closeDialog() }}
         footer={view === 'edit' ? [
-          editing && highlights.some((item) => item.id === editing.id) && <Popconfirm key="delete" title={t('Delete this highlight collection?')} onConfirm={deleteCollection}><Button danger icon={<DeleteOutlined />}>{t('Delete collection')}</Button></Popconfirm>,
-          <Button key="cancel" onClick={closeDialog}>{t('Cancel')}</Button>,
-          <Button key="save" type="primary" disabled={!editing?.title.trim() || !editing?.items.length || readingImages} loading={readingImages} onClick={saveCollection}>{t('Save')}</Button>,
+          editing && highlights.some((item) => item.id === editing.id) && <Popconfirm key="delete" title={t('Delete this highlight collection?')} onConfirm={deleteCollection}><Button danger disabled={savingCollection} icon={<DeleteOutlined />}>{t('Delete collection')}</Button></Popconfirm>,
+          <Button key="cancel" disabled={savingCollection} onClick={closeDialog}>{t('Cancel')}</Button>,
+          <Button key="save" type="primary" disabled={!editing?.title.trim() || !editing?.items.length || readingImages || savingCollection} loading={savingCollection || readingImages} onClick={saveCollection}>{t('Save')}</Button>,
         ] : null}
         width={760}
         destroyOnHidden
@@ -131,8 +186,8 @@ export default function HighlightsSection({ profile, highlights = [], onSave }) 
         {view === 'manage' && <div className="highlights-manager">
           {highlights.length ? highlights.map((collection) => (
             <div className="highlight-manager-row" key={collection.id}>
-              <img className="highlight-manager-cover" src={collection.items[0]?.src} alt="" />
-              <div className="highlight-manager-info"><Typography.Text strong>{collection.title}</Typography.Text><Typography.Text type="secondary">{collection.items.length} {t('photos')}</Typography.Text><Typography.Text type="secondary">{t('Updated')} {formatDate(collection.updatedAt, { dateStyle: 'medium' }, language === 'ta' ? 'ta-LK' : 'en-US')}</Typography.Text></div>
+              <HighlightImage className="highlight-manager-cover" src={collection.items[0]?.src} alt="" fallbackLabel={t('Photo unavailable')} />
+              <div className="highlight-manager-info"><Typography.Text strong>{collection.title}</Typography.Text><Typography.Text type="secondary">{collection.items.length} {t('photos')} · {(collection.articleHighlights || []).length} {t('saved text highlights')}</Typography.Text><Typography.Text type="secondary">{t('Updated')} {formatDate(collection.updatedAt, { dateStyle: 'medium' }, language === 'ta' ? 'ta-LK' : 'en-US')}</Typography.Text></div>
               <Button type="text" aria-label={`${t('Edit')} ${collection.title}`} icon={<EditOutlined />} onClick={() => beginEdit(collection)} />
             </div>
           )) : <Empty description={t('No highlights yet')} />}
@@ -142,13 +197,20 @@ export default function HighlightsSection({ profile, highlights = [], onSave }) 
         {view === 'edit' && editing && <div className="highlight-editor">
           <div className="highlight-editor-cover-wrap">
             <Typography.Text>{t('Cover')}</Typography.Text>
-            {editing.items[0] ? <img className="highlight-editor-cover" src={editing.items[0].src} alt={editing.items[0].name || t('Highlight cover')} /> : <div className="highlight-editor-cover highlight-cover-empty"><UploadOutlined /><span>{t('Add photos')}</span></div>}
+            {editing.items[0] ? <HighlightImage className="highlight-editor-cover" src={editing.items[0].src} alt={editing.items[0].name || t('Highlight cover')} fallbackLabel={t('Photo unavailable')} /> : <div className="highlight-editor-cover highlight-cover-empty"><UploadOutlined /><span>{t('Add photos')}</span></div>}
           </div>
           <label className="field-label" htmlFor="highlight-title">{t('Title')}</label>
-          <Input id="highlight-title" maxLength={60} value={editing.title} onChange={(event) => setEditing((current) => ({ ...current, title: event.target.value }))} placeholder={t('Highlight title')} />
-          <div className="highlight-editor-toolbar"><Typography.Text strong>{t('Photos')} ({editing.items.length}/{MAX_ITEMS})</Typography.Text><Button icon={<PlusOutlined />} loading={readingImages} onClick={() => fileRef.current?.click()}>{t('Add more')}</Button><input ref={fileRef} type="file" accept={ACCEPTED_IMAGES.join(',')} multiple hidden onChange={addImages} /></div>
+          <Input id="highlight-title" maxLength={60} value={editing.title} disabled={savingCollection} onChange={(event) => setEditing((current) => ({ ...current, title: event.target.value }))} placeholder={t('Highlight title')} />
+          {editing.articleHighlights?.length > 0 && <section className="highlight-article-items" aria-label={t('Saved article text')}>
+            <Typography.Text strong>{t('Saved article text')}</Typography.Text>
+            {editing.articleHighlights.map((highlight) => <div className="highlight-article-item" key={highlight.id}>
+              <div><Typography.Text strong>{highlight.articleTitle}</Typography.Text><Typography.Paragraph ellipsis={{ rows: 3, expandable: true, symbol: t('More') }}>{highlight.text}</Typography.Paragraph></div>
+              <Button danger type="text" disabled={savingCollection} aria-label={`${t('Remove')} ${highlight.articleTitle}`} icon={<DeleteOutlined />} onClick={() => setEditing((current) => ({ ...current, articleHighlights: current.articleHighlights.filter((item) => item.id !== highlight.id) }))} />
+            </div>)}
+          </section>}
+          <div className="highlight-editor-toolbar"><Typography.Text strong>{t('Photos')} ({editing.items.length}/{MAX_ITEMS})</Typography.Text><Button icon={<PlusOutlined />} disabled={savingCollection} loading={readingImages} onClick={() => fileRef.current?.click()}>{t('Add more')}</Button><input ref={fileRef} type="file" accept={ACCEPTED_IMAGES.join(',')} multiple hidden onChange={addImages} /></div>
           <div className="highlight-photo-grid">
-            {editing.items.map((image) => <div className="highlight-photo-item" key={image.id}><img src={image.src} alt={image.name} /><Button danger type="text" aria-label={`${t('Remove')} ${image.name}`} icon={<DeleteOutlined />} onClick={() => setEditing((current) => ({ ...current, items: current.items.filter((item) => item.id !== image.id) }))} /></div>)}
+            {editing.items.map((image, index) => <div className="highlight-photo-item" key={image.id}><HighlightImage className="highlight-photo-thumbnail" src={image.src} alt={image.name} fallbackLabel={t('Photo unavailable')} /><Button className="highlight-cover-select" type="text" disabled={savingCollection || index === 0} aria-label={index === 0 ? t('Current cover') : t('Set as cover')} title={index === 0 ? t('Current cover') : t('Set as cover')} icon={index === 0 ? <CheckOutlined /> : <StarOutlined />} onClick={() => chooseCover(index)} /><Button danger type="text" disabled={savingCollection} aria-label={`${t('Remove')} ${image.name}`} icon={<DeleteOutlined />} onClick={() => setEditing((current) => ({ ...current, items: current.items.filter((item) => item.id !== image.id) }))} /></div>)}
           </div>
         </div>}
       </Modal>

@@ -4,7 +4,7 @@ import { richTextToPlainText } from '../../utils/richText.js'
 import { useLanguage } from '../../context/LanguageContext.jsx'
 
 const { Title, Text, Paragraph } = Typography
-const slugify = (value) => value.toLowerCase().trim().replace(/[^\p{L}\p{N}]+/gu, '-').replace(/^-|-$/gu, '')
+const slugify = (value) => (typeof value === 'string' ? value : '').toLowerCase().trim().replace(/[^\p{L}\p{N}]+/gu, '-').replace(/^-|-$/gu, '')
 
 export default function SEOSettingsForm({ article, onChange }) {
   const { t } = useLanguage()

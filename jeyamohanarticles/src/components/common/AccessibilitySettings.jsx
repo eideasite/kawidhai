@@ -56,7 +56,7 @@ function loadSettings() {
       endTime: typeof saved.endTime === 'string' && /^\d{2}:\d{2}$/.test(saved.endTime) ? saved.endTime : DEFAULT_SETTINGS.endTime,
     }
   } catch {
-    return DEFAULT_SETTINGS
+    return { ...DEFAULT_SETTINGS, reduceMotion: systemPrefersReducedMotion() }
   }
 }
 
@@ -71,6 +71,7 @@ export default function AccessibilitySettings({ themeMode, onThemeChange }) {
   const [speechSettings, setSpeechSettings] = useState(loadSpeechSettings)
   const [speechVoices, setSpeechVoices] = useState([])
   const [settings, setSettings] = useState(loadSettings)
+  const [settingsSaveStatus, setSettingsSaveStatus] = useState('idle')
   const matchesQuery = (...values) => {
     const query = searchQuery.trim().toLocaleLowerCase()
     return !query || values.some((value) => value.toLocaleLowerCase().includes(query) || t(value).toLocaleLowerCase().includes(query))
@@ -94,11 +95,6 @@ export default function AccessibilitySettings({ themeMode, onThemeChange }) {
     root.dataset.colourInversion = String(settings.colourInversion)
     root.dataset.reduceBlur = String(settings.reduceBlur)
     root.dataset.reduceMotion = String(settings.reduceMotion)
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(settings))
-    } catch {
-      // The current session settings still apply if storage is unavailable.
-    }
   }, [settings])
 
   useEffect(() => {
@@ -122,8 +118,18 @@ export default function AccessibilitySettings({ themeMode, onThemeChange }) {
     return () => window.removeEventListener('keydown', handleShortcut)
   }, [settings.accessibilityMenuShortcut])
 
+  const applySettings = (nextSettings) => {
+    setSettings(nextSettings)
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(nextSettings))
+      setSettingsSaveStatus('saved')
+    } catch {
+      setSettingsSaveStatus('error')
+    }
+  }
+  const updateSettings = (patch) => applySettings({ ...settings, ...patch })
   const reset = () => {
-    setSettings({ ...DEFAULT_SETTINGS })
+    applySettings({ ...DEFAULT_SETTINGS })
     setSpeechSettings({ ...DEFAULT_SPEECH_SETTINGS })
     window.speechSynthesis?.cancel()
     setSpeaking(false)
@@ -131,7 +137,7 @@ export default function AccessibilitySettings({ themeMode, onThemeChange }) {
   }
   const openAccessibilityMenu = () => { setPage('accessibility-menu'); setOpen(true) }
   const menuAction = (label, icon, action) => <Button className="accessibility-menu-action" key={label} onClick={action} icon={icon}>{t(label)}</Button>
-  const changeLevel = (key, delta, max) => setSettings((current) => ({ ...current, [key]: Math.max(0, Math.min(max, current[key] + delta)) }))
+  const changeLevel = (key, delta, max) => updateSettings({ [key]: Math.max(0, Math.min(max, settings[key] + delta)) })
   const returnToSettings = () => {
     window.speechSynthesis?.cancel()
     setSpeaking(false)
@@ -179,7 +185,7 @@ export default function AccessibilitySettings({ themeMode, onThemeChange }) {
       <div className="accessibility-setting-copy"><Typography.Title level={5}>{t(label)}</Typography.Title><Typography.Text type="secondary">{t(description)}</Typography.Text></div>
       <div className="accessibility-slider-row">
         <Button type="text" aria-label={`${t('Decrease')} ${t(label)}`} disabled={settings[key] === 0} icon={<MinusOutlined />} onClick={() => changeLevel(key, -1, max)} />
-        <Slider aria-label={t(label)} min={0} max={max} step={1} value={settings[key]} tooltip={{ formatter: () => `${Math.round((key === 'fontSize' ? FONT_SCALES : DISPLAY_SCALES)[settings[key]] * 100)}%` }} onChange={(value) => setSettings((current) => ({ ...current, [key]: value }))} />
+        <Slider aria-label={t(label)} min={0} max={max} step={1} value={settings[key]} tooltip={{ formatter: () => `${Math.round((key === 'fontSize' ? FONT_SCALES : DISPLAY_SCALES)[settings[key]] * 100)}%` }} onChange={(value) => updateSettings({ [key]: value })} />
         <Button type="text" aria-label={`${t('Increase')} ${t(label)}`} disabled={settings[key] === max} icon={<PlusOutlined />} onClick={() => changeLevel(key, 1, max)} />
       </div>
     </section>
@@ -235,17 +241,17 @@ export default function AccessibilitySettings({ themeMode, onThemeChange }) {
         {renderSlider('Font size', 'Make text bigger or smaller', 'fontSize', FONT_SCALES.length - 1)}
         {renderSlider('Display size', 'Make everything bigger or smaller', 'displaySize', DISPLAY_SCALES.length - 1)}
         <Typography.Title className="accessibility-section-title" level={5}>{t('Style options')}</Typography.Title>
-        <section className="accessibility-setting-card accessibility-toggle-card"><Typography.Text strong>{t('Bold text')}</Typography.Text><Switch checked={settings.boldText} aria-label={t('Bold text')} onChange={(boldText) => setSettings((current) => ({ ...current, boldText }))} /></section>
-        <section className="accessibility-setting-card accessibility-toggle-card"><div className="accessibility-setting-copy"><Typography.Text strong>{t('Outline text')}</Typography.Text><Typography.Text type="secondary">{t('Add a black or white background around text to increase contrast')}</Typography.Text></div><Switch checked={settings.outlineText} aria-label={t('Outline text')} onChange={(outlineText) => setSettings((current) => ({ ...current, outlineText }))} /></section>
+        <section className="accessibility-setting-card accessibility-toggle-card"><Typography.Text strong>{t('Bold text')}</Typography.Text><Switch checked={settings.boldText} aria-label={t('Bold text')} onChange={(boldText) => updateSettings({ boldText })} /></section>
+        <section className="accessibility-setting-card accessibility-toggle-card"><div className="accessibility-setting-copy"><Typography.Text strong>{t('Outline text')}</Typography.Text><Typography.Text type="secondary">{t('Outline is applied to article and primary reading text.')}</Typography.Text></div><Switch checked={settings.outlineText} aria-label={t('Outline text')} onChange={(outlineText) => updateSettings({ outlineText })} /></section>
         <Button className="accessibility-reset-button" icon={<HistoryOutlined />} onClick={reset}>{t('Reset settings')}</Button>
         </>}
       </> : page === 'colour-motion' ? <div className="colour-motion-page">
         <Typography.Title level={4}>{t('Colour and motion')}</Typography.Title>
-        <section className="accessibility-setting-card colour-motion-select-card"><div className="accessibility-setting-copy"><Typography.Text strong>{t('Colour filter')}</Typography.Text><Typography.Text type="secondary">{t('Applies a colour filter to this website only.')}</Typography.Text></div><Select aria-label={t('Colour filter')} value={settings.colourCorrection} options={[{ value: 'off', label: t('Off') }, { value: 'grayscale', label: t('Grayscale') }, { value: 'reduced-saturation', label: t('Reduced saturation') }]} onChange={(colourCorrection) => setSettings((current) => ({ ...current, colourCorrection }))} /></section>
-        <section className="accessibility-setting-card accessibility-toggle-card"><div className="accessibility-setting-copy"><Typography.Text strong>{t('Colour inversion')}</Typography.Text><Typography.Text type="secondary">{t(settings.colourInversion ? 'On' : 'Off')}</Typography.Text></div><Switch checked={settings.colourInversion} aria-label={t('Colour inversion')} onChange={(colourInversion) => setSettings((current) => ({ ...current, colourInversion }))} /></section>
+        <section className="accessibility-setting-card colour-motion-select-card"><div className="accessibility-setting-copy"><Typography.Text strong>{t('Colour filter')}</Typography.Text><Typography.Text type="secondary">{t('Applies a colour filter to this website only.')}</Typography.Text></div><Select aria-label={t('Colour filter')} value={settings.colourCorrection} options={[{ value: 'off', label: t('Off') }, { value: 'grayscale', label: t('Grayscale') }, { value: 'reduced-saturation', label: t('Reduced saturation') }]} onChange={(colourCorrection) => updateSettings({ colourCorrection })} /></section>
+        <section className="accessibility-setting-card accessibility-toggle-card"><div className="accessibility-setting-copy"><Typography.Text strong>{t('Colour inversion')}</Typography.Text><Typography.Text type="secondary">{t(settings.colourInversion ? 'On' : 'Off')}</Typography.Text></div><Switch checked={settings.colourInversion} aria-label={t('Colour inversion')} onChange={(colourInversion) => updateSettings({ colourInversion })} /></section>
         <Button className="dark-theme-settings-link" onClick={() => setPage('dark-theme')}><span><Typography.Text strong>{t('Dark theme')}</Typography.Text><Typography.Text type="secondary">{t('Change the theme manually.')}</Typography.Text></span><RightOutlined /></Button>
-        <section className="accessibility-setting-card accessibility-toggle-card"><div className="accessibility-setting-copy"><Typography.Text strong>{t('Reduce blur effects')}</Typography.Text><Typography.Text type="secondary">{t('Make backgrounds and panels easier to see')}</Typography.Text></div><Switch checked={settings.reduceBlur} aria-label={t('Reduce blur effects')} onChange={(reduceBlur) => setSettings((current) => ({ ...current, reduceBlur }))} /></section>
-        <section className="accessibility-setting-card accessibility-toggle-card"><div className="accessibility-setting-copy"><Typography.Text strong>{t('Remove animations')}</Typography.Text><Typography.Text type="secondary">{t('Reduce movement on the screen')}</Typography.Text></div><Switch checked={settings.reduceMotion} aria-label={t('Remove animations')} onChange={(reduceMotion) => setSettings((current) => ({ ...current, reduceMotion }))} /></section>
+        <section className="accessibility-setting-card accessibility-toggle-card"><div className="accessibility-setting-copy"><Typography.Text strong>{t('Reduce blur effects')}</Typography.Text><Typography.Text type="secondary">{t('Make backgrounds and panels easier to see')}</Typography.Text></div><Switch checked={settings.reduceBlur} aria-label={t('Reduce blur effects')} onChange={(reduceBlur) => updateSettings({ reduceBlur })} /></section>
+        <section className="accessibility-setting-card accessibility-toggle-card"><div className="accessibility-setting-copy"><Typography.Text strong>{t('Remove animations')}</Typography.Text><Typography.Text type="secondary">{t('Reduce movement on the screen')}</Typography.Text></div><Switch checked={settings.reduceMotion} aria-label={t('Remove animations')} onChange={(reduceMotion) => updateSettings({ reduceMotion })} /></section>
         <Typography.Text type="secondary" className="dark-theme-schedule-note"><InfoCircleOutlined /> {t('These preferences affect this website only; they do not change device accessibility settings.')}</Typography.Text>
       </div> : page === 'accessibility-menu' ? <div className="accessibility-menu-page">
         <Typography.Paragraph>{t('Use quick controls to adjust this app. Device controls such as volume, brightness, locking, and screenshots are not available to websites.')}</Typography.Paragraph>
@@ -254,38 +260,38 @@ export default function AccessibilitySettings({ themeMode, onThemeChange }) {
           {menuAction('Increase text size', <FontSizeOutlined />, () => changeLevel('fontSize', 1, FONT_SCALES.length - 1))}
           {menuAction('Zoom out', <ZoomOutOutlined />, () => changeLevel('displaySize', -1, DISPLAY_SCALES.length - 1))}
           {menuAction('Zoom in', <ZoomInOutlined />, () => changeLevel('displaySize', 1, DISPLAY_SCALES.length - 1))}
-          {menuAction(settings.boldText ? 'Turn bold text off' : 'Turn bold text on', <BoldOutlined />, () => setSettings((current) => ({ ...current, boldText: !current.boldText })))}
+          {menuAction(settings.boldText ? 'Turn bold text off' : 'Turn bold text on', <BoldOutlined />, () => updateSettings({ boldText: !settings.boldText }))}
           {menuAction(themeMode === 'dark' ? 'Use light theme' : 'Use dark theme', <BulbOutlined />, () => onThemeChange(themeMode !== 'dark'))}
           {menuAction('Text-to-speech', <AudioOutlined />, () => setPage('text-to-speech'))}
           {menuAction('Colour and motion', <EyeOutlined />, () => setPage('colour-motion'))}
         </div>
         <Typography.Title className="accessibility-section-title" level={5}>{t('Options')}</Typography.Title>
-        <section className="accessibility-setting-card accessibility-toggle-card"><div className="accessibility-setting-copy"><Typography.Text strong>{t('Accessibility Menu shortcut')}</Typography.Text><Typography.Text type="secondary">{t(settings.accessibilityMenuShortcut ? 'On' : 'Off')} · Alt+Shift+A</Typography.Text></div><Switch checked={settings.accessibilityMenuShortcut} aria-label={t('Accessibility Menu shortcut')} onChange={(accessibilityMenuShortcut) => setSettings((current) => ({ ...current, accessibilityMenuShortcut }))} /></section>
+        <section className="accessibility-setting-card accessibility-toggle-card"><div className="accessibility-setting-copy"><Typography.Text strong>{t('Accessibility Menu shortcut')}</Typography.Text><Typography.Text type="secondary">{t(settings.accessibilityMenuShortcut ? 'On' : 'Off')} · Alt+Shift+A</Typography.Text></div><Switch checked={settings.accessibilityMenuShortcut} aria-label={t('Accessibility Menu shortcut')} onChange={(accessibilityMenuShortcut) => updateSettings({ accessibilityMenuShortcut })} /></section>
         <Button className="dark-theme-settings-link" onClick={() => setPage('main')}><span><SettingOutlined /><Typography.Text strong>{t('Settings')}</Typography.Text></span><RightOutlined /></Button>
         <Button className="dark-theme-settings-link" onClick={() => setAppInfoOpen(true)}><span><Typography.Text strong>{t('App info')}</Typography.Text></span><RightOutlined /></Button>
       </div> : page === 'dark-theme' ? <div className="dark-theme-settings-page">
         <Typography.Paragraph>{t('Use a dark background to make this writing space more comfortable. Your theme is saved on this device.')}</Typography.Paragraph>
         <section className="dark-theme-toggle-card"><Typography.Text strong>{t('Use dark theme')}</Typography.Text><Switch checked={themeMode === 'dark'} aria-label={t('Use dark theme')} onChange={onThemeChange} /></section>
         <Typography.Title className="accessibility-section-title" level={5}>{t('Theme style')}</Typography.Title>
-        <Radio.Group className="dark-theme-mode-options" value={settings.darkModeType} onChange={(event) => setSettings((current) => ({ ...current, darkModeType: event.target.value }))}>
+        <Radio.Group className="dark-theme-mode-options" value={settings.darkModeType} onChange={(event) => updateSettings({ darkModeType: event.target.value })}>
           <Radio value="standard"><span className="dark-theme-mode-copy"><Typography.Text strong>{t('Standard')}</Typography.Text><Typography.Text type="secondary">{t('Use the app dark theme as designed.')}</Typography.Text></span></Radio>
           <Radio value="expanded"><span className="dark-theme-mode-copy"><Typography.Text strong>{t('Expanded')}</Typography.Text><Typography.Text type="secondary">{t('Use stronger dark surfaces and contrast throughout this app.')}</Typography.Text></span></Radio>
         </Radio.Group>
-        <section className="accessibility-setting-card accessibility-toggle-card"><div className="accessibility-setting-copy"><Typography.Text strong>{t('Pure black')}</Typography.Text><Typography.Text type="secondary">{t('Pure black background for dark theme')}</Typography.Text></div><Switch checked={settings.pureBlack} aria-label={t('Pure black')} disabled={themeMode !== 'dark'} onChange={(pureBlack) => setSettings((current) => ({ ...current, pureBlack }))} /></section>
+        <section className="accessibility-setting-card accessibility-toggle-card"><div className="accessibility-setting-copy"><Typography.Text strong>{t('Pure black')}</Typography.Text><Typography.Text type="secondary">{t('Pure black background for dark theme')}</Typography.Text></div><Switch checked={settings.pureBlack} aria-label={t('Pure black')} disabled={themeMode !== 'dark'} onChange={(pureBlack) => updateSettings({ pureBlack })} /></section>
         <Typography.Title className="accessibility-section-title" level={5}>{t('Timing')}</Typography.Title>
-        <Radio.Group className="dark-theme-timing-options" value={settings.timing} onChange={(event) => setSettings((current) => ({ ...current, timing: event.target.value }))}>
+        <Radio.Group className="dark-theme-timing-options" value={settings.timing} onChange={(event) => updateSettings({ timing: event.target.value })}>
           <Radio value="off"><span className="dark-theme-mode-copy"><Typography.Text strong>{t('Off')}</Typography.Text><Typography.Text type="secondary">{t('Change the theme manually.')}</Typography.Text></span></Radio>
           <Radio value="schedule"><span className="dark-theme-mode-copy"><Typography.Text strong>{t('Schedule')}</Typography.Text><Typography.Text type="secondary">{t('Turns on at custom time')}</Typography.Text></span></Radio>
         </Radio.Group>
         <section className="dark-theme-time-options">
-          <label className="accessibility-setting-card"><span><Typography.Text strong>{t('Start time')}</Typography.Text><Typography.Text type="secondary">{settings.startTime}</Typography.Text></span><input aria-label={t('Start time')} type="time" value={settings.startTime} onChange={(event) => setSettings((current) => ({ ...current, startTime: event.target.value }))} /></label>
-          <label className="accessibility-setting-card"><span><Typography.Text strong>{t('End time')}</Typography.Text><Typography.Text type="secondary">{settings.endTime}</Typography.Text></span><input aria-label={t('End time')} type="time" value={settings.endTime} onChange={(event) => setSettings((current) => ({ ...current, endTime: event.target.value }))} /></label>
+          <label className="accessibility-setting-card"><span><Typography.Text strong>{t('Start time')}</Typography.Text><Typography.Text type="secondary">{settings.startTime}</Typography.Text></span><input aria-label={t('Start time')} type="time" value={settings.startTime} onChange={(event) => updateSettings({ startTime: event.target.value })} /></label>
+          <label className="accessibility-setting-card"><span><Typography.Text strong>{t('End time')}</Typography.Text><Typography.Text type="secondary">{settings.endTime}</Typography.Text></span><input aria-label={t('End time')} type="time" value={settings.endTime} onChange={(event) => updateSettings({ endTime: event.target.value })} /></label>
         </section>
         <Typography.Text type="secondary" className="dark-theme-schedule-note"><InfoCircleOutlined /> {t('The schedule follows this device local time while this app is open.')}</Typography.Text>
         <div className="dark-theme-modes-info"><InfoCircleOutlined /><span>{t('Device modes can also turn on dark theme.')}</span><Button type="link" className="dark-theme-modes-link" onClick={() => setSystemModesInfoOpen(true)}>{t('About device modes')}</Button></div>
       </div> : page === 'text-formatting' ? <div className="text-format-settings-page">
-        <section className="accessibility-setting-card accessibility-toggle-card"><div className="accessibility-setting-copy"><Typography.Text strong>{t('Outline text')}</Typography.Text><Typography.Text type="secondary">{t('Add a black or white background around text to increase contrast')}</Typography.Text></div><Switch checked={settings.outlineText} aria-label={t('Outline text')} onChange={(outlineText) => setSettings((current) => ({ ...current, outlineText }))} /></section>
-        <section className="accessibility-setting-card accessibility-toggle-card"><div className="accessibility-setting-copy"><Typography.Text strong>{t('Bold text')}</Typography.Text><Typography.Text type="secondary">{t('Make text easier to distinguish.')}</Typography.Text></div><Switch checked={settings.boldText} aria-label={t('Bold text')} onChange={(boldText) => setSettings((current) => ({ ...current, boldText }))} /></section>
+        <section className="accessibility-setting-card accessibility-toggle-card"><div className="accessibility-setting-copy"><Typography.Text strong>{t('Outline text')}</Typography.Text><Typography.Text type="secondary">{t('Outline is applied to article and primary reading text.')}</Typography.Text></div><Switch checked={settings.outlineText} aria-label={t('Outline text')} onChange={(outlineText) => updateSettings({ outlineText })} /></section>
+        <section className="accessibility-setting-card accessibility-toggle-card"><div className="accessibility-setting-copy"><Typography.Text strong>{t('Bold text')}</Typography.Text><Typography.Text type="secondary">{t('Make text easier to distinguish.')}</Typography.Text></div><Switch checked={settings.boldText} aria-label={t('Bold text')} onChange={(boldText) => updateSettings({ boldText })} /></section>
       </div> : <div className="text-to-speech-settings-page">
         <Typography.Title level={4}>{t('Text-to-speech output')}</Typography.Title>
         <Typography.Paragraph>{t('Speech uses voices available in this browser or device. TalkBack and system verbosity are managed in device settings.')}</Typography.Paragraph>
@@ -297,6 +303,7 @@ export default function AccessibilitySettings({ themeMode, onThemeChange }) {
           {speaking && <Button onClick={() => { window.speechSynthesis.cancel(); setSpeaking(false) }}>{t('Stop')}</Button>}
         </> : <Typography.Text type="secondary">{t('Text-to-speech is not supported by this browser.')}</Typography.Text>}
       </div>}
+      {page !== 'text-to-speech' && <Typography.Text className="accessibility-save-status" type={settingsSaveStatus === 'error' ? 'danger' : 'secondary'} role="status" aria-live="polite">{t(settingsSaveStatus === 'error' ? 'Preferences apply for this session but could not be saved.' : settingsSaveStatus === 'saved' ? 'Accessibility preferences saved in this browser.' : 'Changes apply immediately.')}</Typography.Text>}
     </Modal>
     <Modal title={t('About device modes')} open={systemModesInfoOpen} onCancel={() => setSystemModesInfoOpen(false)} onOk={() => setSystemModesInfoOpen(false)} okText={t('Close')} cancelButtonProps={{ style: { display: 'none' } }}>
       <Typography.Paragraph>{t('This website cannot read or change device modes. Its custom schedule follows this browser local time while the app is open.')}</Typography.Paragraph>

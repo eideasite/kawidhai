@@ -1,8 +1,18 @@
-const ALLOWED_TAGS = new Set(['P', 'DIV', 'BR', 'STRONG', 'B', 'EM', 'I', 'U', 'S', 'H1', 'H2', 'H3', 'UL', 'OL', 'LI', 'BLOCKQUOTE', 'PRE', 'CODE', 'HR', 'A', 'IMG'])
-const DROP_TAGS = new Set(['SCRIPT', 'STYLE', 'IFRAME', 'OBJECT', 'EMBED', 'SVG', 'MATH'])
+import DOMPurify from 'dompurify'
+
+const ALLOWED_TAGS = new Set(['P', 'DIV', 'BR', 'STRONG', 'B', 'EM', 'I', 'U', 'S', 'SPAN', 'H1', 'H2', 'H3', 'UL', 'OL', 'LI', 'BLOCKQUOTE', 'PRE', 'CODE', 'HR', 'A', 'IMG'])
+const SANITIZE_OPTIONS = {
+  ALLOWED_TAGS: [...ALLOWED_TAGS].map((tag) => tag.toLowerCase()),
+  ALLOWED_ATTR: ['href', 'src', 'alt', 'data-text-size'],
+  ALLOW_DATA_ATTR: false,
+  ALLOW_ARIA_ATTR: false,
+  FORBID_TAGS: ['script', 'style', 'iframe', 'object', 'embed', 'svg', 'math', 'form'],
+  RETURN_TRUSTED_TYPE: false,
+}
 
 export function isRichTextHtml(value = '') {
-  return /<(?:p|div|br|strong|b|em|i|u|s|h[1-3]|ul|ol|li|blockquote|pre|code|hr|a|img)(?:\s|\/?>)/i.test(value)
+  return typeof value === 'string'
+    && /<(?:p|div|br|strong|b|em|i|u|s|span|h[1-3]|ul|ol|li|blockquote|pre|code|hr|a|img)(?:\s|\/?>)/i.test(value)
 }
 
 export function escapeHtml(value = '') {
@@ -12,47 +22,50 @@ export function escapeHtml(value = '') {
 }
 
 function isSafeUrl(value, image = false) {
-  if (image && /^data:image\/(?:png|jpeg|gif|webp);base64,[A-Za-z0-9+/]+={0,2}$/i.test(value) && value.length <= 1500000) return true
+  const candidate = typeof value === 'string' ? value.trim() : ''
+  if (!candidate || [...candidate].some((character) => {
+    const code = character.charCodeAt(0)
+    return code <= 31 || code === 127
+  })) return false
+  if (image && /^data:image\/(?:png|jpeg|gif|webp);base64,[A-Za-z0-9+/]+={0,2}$/i.test(candidate) && candidate.length <= 1500000) return true
   try {
-    const url = new URL(value, window.location.origin)
-    return image ? ['http:', 'https:'].includes(url.protocol) : ['http:', 'https:', 'mailto:'].includes(url.protocol)
+    const url = new URL(candidate, window.location.origin)
+    if (url.username || url.password) return false
+    if (url.protocol === 'mailto:') return !image
+    if (!['http:', 'https:'].includes(url.protocol)) return false
+    return url.origin === window.location.origin || url.protocol === 'https:'
   } catch {
     return false
   }
 }
 
-function cleanNode(node) {
-  for (const child of [...node.childNodes]) {
-    if (child.nodeType !== Node.ELEMENT_NODE) continue
-    if (DROP_TAGS.has(child.tagName)) { child.remove(); continue }
-    cleanNode(child)
-    if (!ALLOWED_TAGS.has(child.tagName)) {
-      child.replaceWith(...child.childNodes)
-      continue
-    }
-    const tag = child.tagName
-    const href = child.getAttribute('href')
-    const src = child.getAttribute('src')
-    const alt = child.getAttribute('alt') || ''
-    for (const attr of [...child.attributes]) child.removeAttribute(attr.name)
-    if (tag === 'A' && href && isSafeUrl(href)) {
-      child.setAttribute('href', href)
-      child.setAttribute('target', '_blank')
-      child.setAttribute('rel', 'noopener noreferrer')
-    }
-    if (tag === 'IMG') {
-      if (src && isSafeUrl(src, true)) child.setAttribute('src', src)
-      child.setAttribute('alt', alt)
-      child.setAttribute('loading', 'lazy')
-    }
-  }
-}
-
 export function sanitizeRichTextHtml(value = '') {
+  if (typeof value !== 'string') return ''
   if (typeof DOMParser === 'undefined') return escapeHtml(value)
   const template = document.createElement('template')
-  template.innerHTML = String(value)
-  cleanNode(template.content)
+  template.innerHTML = DOMPurify.sanitize(value, SANITIZE_OPTIONS)
+  template.content.querySelectorAll('a').forEach((anchor) => {
+    const href = anchor.getAttribute('href')
+    if (!href || !isSafeUrl(href)) {
+      anchor.removeAttribute('href')
+      anchor.removeAttribute('target')
+      anchor.removeAttribute('rel')
+      return
+    }
+    anchor.setAttribute('href', href.trim())
+    anchor.setAttribute('target', '_blank')
+    anchor.setAttribute('rel', 'noopener noreferrer')
+  })
+  template.content.querySelectorAll('img').forEach((image) => {
+    const src = image.getAttribute('src')
+    if (!src || !isSafeUrl(src, true)) image.removeAttribute('src')
+    else image.setAttribute('src', src.trim())
+    image.setAttribute('loading', 'lazy')
+  })
+  template.content.querySelectorAll('span').forEach((span) => {
+    const textSize = span.getAttribute('data-text-size')
+    if (!/^[0-4]$/.test(textSize || '')) span.removeAttribute('data-text-size')
+  })
   return template.innerHTML
 }
 
@@ -67,7 +80,8 @@ function formatMarkdownInline(value) {
 }
 
 export function plainTextToHtml(value = '') {
-  const lines = String(value).split('\n')
+  if (typeof value !== 'string') return ''
+  const lines = value.split('\n')
   const output = []
   let listType = null
   const closeList = () => { if (listType) { output.push(`</${listType}>`); listType = null } }
@@ -92,12 +106,13 @@ export function plainTextToHtml(value = '') {
 }
 
 export function richTextToHtml(value = '') {
-  if (!String(value).trim()) return ''
+  if (typeof value !== 'string' || !value.trim()) return ''
   return sanitizeRichTextHtml(isRichTextHtml(value) ? value : plainTextToHtml(value))
 }
 
 export function richTextToPlainText(value = '') {
-  if (typeof DOMParser === 'undefined') return String(value).replace(/<[^>]*>/g, ' ')
+  if (typeof value !== 'string' || !value.trim()) return ''
+  if (typeof DOMParser === 'undefined') return value.replace(/<[^>]*>/g, ' ')
   const doc = new DOMParser().parseFromString(richTextToHtml(value), 'text/html')
   doc.querySelectorAll('img').forEach((node) => node.replaceWith(node.alt || '[Image]'))
   doc.querySelectorAll('br,hr').forEach((node) => node.replaceWith('\n'))
