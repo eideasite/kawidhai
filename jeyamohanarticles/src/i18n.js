@@ -1,6 +1,3 @@
-/* eslint-disable react-refresh/only-export-components */
-import { createContext, useCallback, useContext } from 'react'
-
 const tamil = {
   'Search accessibility settings': 'அணுகல்தன்மை அமைப்புகளைத் தேடுக', 'Text-to-speech': 'உரையைப் பேச்சாக மாற்றுதல்', 'Browser speech options': 'உலாவியின் பேச்சு விருப்பங்கள்', 'Text formatting options': 'உரை வடிவமைப்பு விருப்பங்கள்', 'Bold and outline text': 'தடித்த மற்றும் விளிம்புள்ள உரை', Display: 'காட்சி', 'Display size & text': 'காட்சி அளவு மற்றும் உரை', 'Display > Color contrast': 'காட்சி > நிற வேறுபாடு', Accessibility: 'அணுகல்தன்மை', 'Text-to-speech output': 'உரைப் பேச்சு வெளியீடு', 'Make text easier to distinguish.': 'உரையை எளிதில் வேறுபடுத்திக் காணும்படி செய்யவும்.', 'Speech uses voices available in this browser or device. TalkBack and system verbosity are managed in device settings.': 'இந்த உலாவி அல்லது சாதனத்தில் உள்ள குரல்களைப் பேச்சு வசதி பயன்படுத்தும். TalkBack மற்றும் பேச்சு அமைப்புகள் சாதன அமைப்புகளில் நிர்வகிக்கப்படும்.', 'Test text-to-speech': 'உரைப் பேச்சைச் சோதிக்கவும்', 'Text-to-speech is not supported by this browser.': 'இந்த உலாவியில் உரைப் பேச்சு வசதி இல்லை.', 'This is a sample of text to speech.': 'இது உரையைப் பேச்சாக மாற்றும் வசதிக்கான மாதிரி.', 'Speaking...': 'பேசுகிறது...', Stop: 'நிறுத்து',
   'Accessibility settings': 'அணுகல்தன்மை அமைப்புகள்', 'Size options': 'அளவு விருப்பங்கள்', 'Font size': 'எழுத்தளவு', 'Make text bigger or smaller': 'எழுத்தைச் சிறிதாகவோ பெரிதாகவோ மாற்றவும்', 'Display size': 'திரை அளவு', 'Make everything bigger or smaller': 'அனைத்தையும் சிறிதாகவோ பெரிதாகவோ மாற்றவும்', 'Style options': 'தோற்ற விருப்பங்கள்', 'Bold text': 'தடித்த எழுத்து', 'Outline text': 'எழுத்தைச் சுற்றி விளிம்பு', 'Add a black or white background around text to increase contrast': 'எழுத்து தெளிவாகத் தெரிய கருப்பு அல்லது வெள்ளை விளிம்பைச் சேர்க்கவும்', 'Reset settings': 'அமைப்புகளை மீட்டமை', Decrease: 'குறைக்கவும்', Increase: 'அதிகரிக்கவும்', 'Dark theme': 'இருண்ட தோற்றம்', 'Use a dark background for comfortable viewing.': 'வசதியாகப் பார்ப்பதற்கு இருண்ட பின்னணியைப் பயன்படுத்தவும்.', 'Use a dark background to make this writing space more comfortable. Your theme is saved on this device.': 'எழுத்துப் பணியிடத்தை வசதியாகப் பயன்படுத்த இருண்ட பின்னணியைத் தேர்ந்தெடுக்கவும். தோற்றம் இந்தச் சாதனத்தில் சேமிக்கப்படும்.', 'Use dark theme': 'இருண்ட தோற்றத்தைப் பயன்படுத்து', 'Theme style': 'தோற்ற வகை', Standard: 'சாதாரணம்', Expanded: 'விரிவாக்கம்', 'Use the app dark theme as designed.': 'இந்தப் பயன்பாட்டின் இருண்ட தோற்றத்தைப் பயன்படுத்தவும்.', 'Use stronger dark surfaces and contrast throughout this app.': 'இந்தப் பயன்பாட்டில் அதிக மாறுபாடுள்ள இருண்ட தோற்றத்தைப் பயன்படுத்தவும்.', 'Pure black': 'முழுக் கருப்பு', 'Pure black background for dark theme': 'இருண்ட தோற்றத்தில் முழுக் கருப்புப் பின்னணி', Timing: 'நேர அமைப்பு', Off: 'முடக்கு', 'Change the theme manually.': 'தோற்றத்தை கைமுறையாக மாற்றவும்.', Schedule: 'அட்டவணை', 'Turns on at custom time': 'குறிப்பிட்ட நேரத்தில் இயக்கப்படும்', 'Start time': 'தொடக்க நேரம்', 'End time': 'முடிவு நேரம்', 'The schedule follows this device local time while this app is open.': 'இந்தப் பயன்பாடு திறந்திருக்கும் போது அட்டவணை சாதனத்தின் உள்ளூர் நேரத்தைப் பின்பற்றும்.', 'Device modes can also turn on dark theme.': 'சாதனத்தின் பயன்முறைகளும் இருண்ட தோற்றத்தை இயக்கலாம்.', 'This website cannot read or change device modes. Its custom schedule follows this browser local time while the app is open.': 'இந்த இணையதளம் சாதனப் பயன்முறைகளைப் படிக்கவோ மாற்றவோ முடியாது. பயன்பாடு திறந்திருக்கும் போது தனிப்பயன் அட்டவணை உலாவியின் உள்ளூர் நேரத்தைப் பின்பற்றும்.',
@@ -8,12 +5,17 @@ const tamil = {
   'Article preview': 'கட்டுரை முன்னோட்டம்', 'Save as PDF': 'PDF ஆகச் சேமி', 'Choose Save as PDF in the browser print dialog.': 'அச்சிடும் சாளரத்தில் Save as PDF என்பதைத் தேர்ந்தெடுக்கவும்.', Close: 'மூடு',
   'Write a Post': 'இடுகை எழுத', 'Write an Article': 'கட்டுரை எழுத', Photo: 'புகைப்படம்', 'Write article': 'கட்டுரை எழுத',
   'Start writing a post': 'இடுகை எழுதத் தொடங்குங்கள்', Posts: 'இடுகைகள்', 'Local post': 'இந்த உலாவியில் மட்டும் சேமிக்கப்பட்டது',
+  'Copy post': 'இடுகையை நகலெடு', 'Post copied. Paste it wherever you need.': 'இடுகை நகலெடுக்கப்பட்டது. தேவையான இடத்தில் ஒட்டுங்கள்.',
+  'This post has no text to copy.': 'நகலெடுக்க இந்த இடுகையில் உரை இல்லை.',
+  'Could not copy the post. Select and copy the text instead.': 'இடுகையை நகலெடுக்க முடியவில்லை. உரையைத் தேர்ந்தெடுத்து நகலெடுக்கவும்.',
   Post: 'இடுகையிடு', 'Post saved in this browser.': 'இடுகை இந்த உலாவியில் சேமிக்கப்பட்டது.',
   'This creates a local post in this browser only.': 'இந்த இடுகை இந்த உலாவியில் மட்டும் சேமிக்கப்படும்.',
+  'Article body': 'கட்டுரையின் உட்பகுதி',
   'Could not save this post in this browser.': 'இந்த உலாவியில் இடுகையைச் சேமிக்க முடியவில்லை.',
   'Write Article': 'கட்டுரை எழுதுக', Profile: 'சுயவிவரம்', 'Article Editor': 'கட்டுரை திருத்தி',
+  'Focus mode': 'கவனக் குவிப்பு முறை', 'Exit focus mode': 'கவனக் குவிப்பு முறையை விட்டு வெளியேறு',
   'SEO Settings': 'SEO அமைப்புகள்', 'Published Post': 'வெளியிடப்பட்ட கட்டுரை', 'Articles Management': 'கட்டுரைகள் நிர்வாகம்',
-  'Open navigation': 'வழிசெலுத்தலைத் திறக்கவும்', 'Switch to light mode': 'பகல் பயன்முறைக்கு மாற்றவும்',
+  'Open navigation': 'வழிசெலுத்தலைத் திறக்கவும்', 'Close navigation': 'வழிசெலுத்தலை மூடவும்', 'Switch to light mode': 'பகல் பயன்முறைக்கு மாற்றவும்',
   'Choose language': 'மொழியைத் தேர்ந்தெடுக்கவும்',
   'Switch to night mode': 'இரவு பயன்முறைக்கு மாற்றவும்', 'Personal writing space': 'தனிப்பட்ட எழுத்து இடம்',
   'Add an image': 'படம் சேர்க்கவும்', 'Add an emoji': 'எமோஜி சேர்க்கவும்', 'Start writing an article': 'கட்டுரை எழுதத் தொடங்கவும்',
@@ -87,6 +89,7 @@ const tamil = {
   'Could not publish this article. Your draft is still saved.': '\u0b95\u0b9f\u0bcd\u0b9f\u0bc1\u0bb0\u0bc8\u0baf\u0bc8 \u0bb5\u0bc6\u0bb3\u0bbf\u0baf\u0bbf\u0b9f \u0bae\u0bc1\u0b9f\u0bbf\u0baf\u0bb5\u0bbf\u0bb2\u0bcd\u0bb2\u0bc8. \u0bb5\u0bb0\u0bc8\u0bb5\u0bc1 \u0b87\u0ba9\u0bcd\u0ba9\u0bc1\u0bae\u0bcd \u0b9a\u0bc7\u0bae\u0bbf\u0b95\u0bcd\u0b95\u0baa\u0bcd\u0baa\u0b9f\u0bcd\u0b9f\u0bc1\u0bb3\u0bcd\u0bb3\u0ba4\u0bc1.',
   'Could not save this schedule. Your draft is still saved.': '\u0b85\u0b9f\u0bcd\u0b9f\u0bb5\u0ba3\u0bc8\u0baf\u0bc8\u0b9a\u0bcd \u0b9a\u0bc7\u0bae\u0bbf\u0b95\u0bcd\u0b95 \u0bae\u0bc1\u0b9f\u0bbf\u0baf\u0bb5\u0bbf\u0bb2\u0bcd\u0bb2\u0bc8. \u0bb5\u0bb0\u0bc8\u0bb5\u0bc1 \u0b87\u0ba9\u0bcd\u0ba9\u0bc1\u0bae\u0bcd \u0b9a\u0bc7\u0bae\u0bbf\u0b95\u0bcd\u0b95\u0baa\u0bcd\u0baa\u0b9f\u0bcd\u0b9f\u0bc1\u0bb3\u0bcd\u0bb3\u0ba4\u0bc1.',
   'The schedule was saved in this browser only.': 'திட்ட நேரம் இந்த உலாவியில் மட்டும் சேமிக்கப்பட்டது.', 'Draft discarded.': 'வரைவு நீக்கப்பட்டது.',
+  'Something went wrong': 'ஏதோ தவறு ஏற்பட்டது', 'The page encountered an error. Your saved browser data is unchanged.': 'இந்தப் பக்கத்தில் பிழை ஏற்பட்டது. உலாவியில் சேமித்த தரவு மாற்றப்படவில்லை.', 'Try again': 'மீண்டும் முயற்சிக்கவும்',
   'Page not found': 'பக்கம் கிடைக்கவில்லை', 'Go back to your articles.': 'உங்கள் கட்டுரைகள் பக்கத்திற்குத் திரும்புங்கள்.', 'Go to articles': 'கட்டுரைகளுக்குச் செல்லவும்',
 }
 
@@ -101,18 +104,100 @@ Object.assign(tamil, { 'Outline is applied to article and primary reading text.'
 Object.assign(tamil, { 'Save selected text to Highlights': 'தேர்ந்தெடுத்த உரையை சிறப்பம்சங்களில் சேமி', 'Save article to Highlights': 'கட்டுரையை சிறப்பம்சங்களில் சேமி', 'Save selection to Highlights': 'தேர்வை சிறப்பம்சங்களில் சேமி', 'Selected text will be saved.': 'தேர்ந்தெடுத்த உரை சேமிக்கப்படும்.', 'No text selected; the whole article will be saved.': 'உரை தேர்ந்தெடுக்கப்படவில்லை; முழுக் கட்டுரையும் சேமிக்கப்படும்.', 'Create a Highlight Collection before saving.': 'சேமிப்பதற்கு முன் சிறப்பம்சத் தொகுப்பை உருவாக்கவும்.', 'Untitled highlight collection': 'பெயரிடப்படாத சிறப்பம்சத் தொகுப்பு', 'Saved to Highlights': 'சிறப்பம்சங்களில் சேமிக்கப்பட்டது', 'Choose an available Highlight Collection.': 'கிடைக்கும் சிறப்பம்சத் தொகுப்பைத் தேர்ந்தெடுக்கவும்.', 'There is no article text to save.': 'சேமிக்க கட்டுரை உரை இல்லை.', 'This text is already saved in that collection.': 'இந்த உரை ஏற்கனவே அந்தத் தொகுப்பில் சேமிக்கப்பட்டுள்ளது.', 'saved text highlights': 'சேமித்த உரை சிறப்பம்சங்கள்', 'Saved article text': 'சேமித்த கட்டுரை உரை', More: 'மேலும்' })
 Object.assign(tamil, { 'Speech and text': 'பேச்சும் உரையும்' })
 
-Object.assign(tamil, { 'Recent Posts': 'சமீபத்திய பதிவுகள்', 'See More': 'மேலும் பார்க்க', 'Show Less': 'குறைவாகக் காட்டு', 'No posts yet': 'இன்னும் பதிவுகள் இல்லை', 'Article preview actions': 'கட்டுரை முன்னோட்ட செயல்கள்', 'Save Draft': 'வரைவைச் சேமி', 'Saving draft...': 'வரைவு சேமிக்கப்படுகிறது...', 'Save failed': 'சேமிக்க முடியவில்லை', 'Your edits remain in this editor. Try saving again.': 'உங்கள் திருத்தங்கள் இங்கே உள்ளன. மீண்டும் சேமிக்கவும்.', 'Your draft changes are stored in this browser.': 'உங்கள் வரைவு மாற்றங்கள் இந்த உலாவியில் சேமிக்கப்பட்டுள்ளன.', 'Your draft changes are being saved in this browser.': 'உங்கள் வரைவு மாற்றங்கள் இந்த உலாவியில் சேமிக்கப்படுகின்றன.', Back: 'பின்செல்' })
+Object.assign(tamil, { 'Recent Posts': 'சமீபத்திய பதிவுகள்', 'Total posts: {count}': 'மொத்தப் பதிவுகள்: {count}', 'See More': 'மேலும் பார்க்க', 'Show Less': 'குறைவாகக் காட்டு', 'No posts yet': 'இன்னும் பதிவுகள் இல்லை', 'Article preview actions': 'கட்டுரை முன்னோட்ட செயல்கள்', 'Save Draft': 'வரைவைச் சேமி', 'Saving draft...': 'வரைவு சேமிக்கப்படுகிறது...', 'Save failed': 'சேமிக்க முடியவில்லை', 'Your edits remain in this editor. Try saving again.': 'உங்கள் திருத்தங்கள் இங்கே உள்ளன. மீண்டும் சேமிக்கவும்.', 'Your draft changes are stored in this browser.': 'உங்கள் வரைவு மாற்றங்கள் இந்த உலாவியில் சேமிக்கப்பட்டுள்ளன.', 'Your draft changes are being saved in this browser.': 'உங்கள் வரைவு மாற்றங்கள் இந்த உலாவியில் சேமிக்கப்படுகின்றன.', Back: 'பின்செல்' })
 Object.assign(tamil, { Bookmarks: 'புத்தகக்குறிகள்', 'Articles you saved for quick access.': 'விரைவாக அணுக நீங்கள் சேமித்த கட்டுரைகள்.', 'Bookmark article': 'கட்டுரையைப் புத்தகக்குறியிடு', 'Remove bookmark': 'புத்தகக்குறியை நீக்கு', Bookmarked: 'புத்தகக்குறியிடப்பட்டது', Bookmark: 'புத்தகக்குறி', 'Home Shortcuts': 'முகப்புக் குறுக்குவழிகள்', 'Add to Home Shortcuts': 'முகப்புக் குறுக்குவழிகளில் சேர்', 'Remove from Home Shortcuts': 'முகப்புக் குறுக்குவழிகளில் இருந்து நீக்கு', 'Remove home shortcut': 'முகப்புக் குறுக்குவழியை நீக்கு', 'In shortcuts': 'குறுக்குவழிகளில் உள்ளது', 'Add shortcut': 'குறுக்குவழி சேர்', 'Article bookmarked.': 'கட்டுரை புத்தகக்குறியிடப்பட்டது.', 'Bookmark removed.': 'புத்தகக்குறி நீக்கப்பட்டது.', 'Could not save bookmarks in this browser.': 'இந்த உலாவியில் புத்தகக்குறிகளைச் சேமிக்க முடியவில்லை.', 'Article added to Home Shortcuts.': 'கட்டுரை முகப்புக் குறுக்குவழிகளில் சேர்க்கப்பட்டது.', 'Article removed from Home Shortcuts.': 'கட்டுரை முகப்புக் குறுக்குவழிகளில் இருந்து நீக்கப்பட்டது.', 'Could not save Home Shortcuts in this browser.': 'இந்த உலாவியில் முகப்புக் குறுக்குவழிகளைச் சேமிக்க முடியவில்லை.', 'This article is no longer available.': 'இந்தக் கட்டுரை இனி கிடைக்கவில்லை.', 'Some shortcuts point to articles that are no longer available.': 'சில குறுக்குவழிகள் இனி கிடைக்காத கட்டுரைகளைக் குறிக்கின்றன.', 'Saved shortcuts are unavailable.': 'சேமித்த குறுக்குவழிகள் கிடைக்கவில்லை.', 'No Home Shortcuts yet': 'முகப்புக் குறுக்குவழிகள் இன்னும் இல்லை', 'Some bookmarked articles are no longer available.': 'சில புத்தகக்குறியிட்ட கட்டுரைகள் இனி கிடைக்கவில்லை.', 'Saved bookmarks are unavailable.': 'சேமித்த புத்தகக்குறிகள் கிடைக்கவில்லை.', 'No bookmarked articles yet': 'புத்தகக்குறியிட்ட கட்டுரைகள் இன்னும் இல்லை' })
 
+Object.assign(tamil, { Archive: 'ஆவணகம்', 'Your library': 'உங்கள் நூலகம்', 'Archived articles are kept here until you restore them.': 'மீட்டெடுக்கும் வரை காப்பகப்படுத்திய கட்டுரைகள் இங்கே இருக்கும்.', 'No archived articles yet': 'காப்பகத்தில் இன்னும் கட்டுரைகள் இல்லை', 'Archive article': 'கட்டுரையை காப்பகப்படுத்து', 'Restore from archive': 'காப்பகத்திலிருந்து மீட்டெடு', 'Article moved to Archive.': 'கட்டுரை காப்பகத்திற்கு நகர்த்தப்பட்டது.', 'Article restored from Archive.': 'கட்டுரை காப்பகத்திலிருந்து மீட்டெடுக்கப்பட்டது.' })
+
+Object.assign(tamil, { 'Open profile': 'சுயவிவரத்தைத் திற' })
+
+Object.assign(tamil, { 'New search': 'புதிய தேடல்', 'Listening...': 'கேட்கிறது...', 'Search by voice': 'குரல் மூலம் தேடு', 'Search with Google Lens': 'Google Lens மூலம் தேடு', 'AI Mode': 'AI பயன்முறை', 'Voice search is not supported in this browser.': 'இந்த உலாவியில் குரல் தேடல் ஆதரிக்கப்படவில்லை.', 'Voice search could not start. Check microphone access and try again.': 'குரல் தேடலைத் தொடங்க முடியவில்லை. மைக்ரோஃபோன் அனுமதியைச் சரிபார்த்து மீண்டும் முயற்சிக்கவும்.' })
+
+Object.assign(tamil, {
+  'All rights reserved.': 'அனைத்து உரிமைகளும் பாதுகாக்கப்பட்டவை.',
+  'Contact:': 'தொடர்புக்கு:',
+})
+
+Object.assign(tamil, {
+  'YOUR WRITING': 'உங்கள் எழுத்து',
+  'External tools': 'வெளிப்புற கருவிகள்',
+  'External AI tools': 'வெளிப்புற AI கருவிகள்',
+  'Write one prompt, then open a provider or all three. Your prompt is saved in this browser and copied only when you choose an AI action.': 'ஒரு prompt எழுதி, விரும்பும் AI-ஐ அல்லது மூன்றையும் திறக்கவும். உங்கள் prompt இந்த உலாவியில் சேமிக்கப்படும்; AI செயலைத் தேர்ந்தெடுத்தால் மட்டுமே copy செய்யப்படும்.',
+  'Prompt canvas': 'Prompt எழுதும் இடம்',
+  'Your posts and article drafts are never included. Paste the copied prompt into an AI service and send it there yourself.': 'உங்கள் பதிவுகளும் கட்டுரை வரைவுகளும் சேர்க்கப்படாது. நகலெடுத்த prompt-ஐ AI சேவையில் ஒட்டி, நீங்களே அனுப்புங்கள்.',
+  'Prompt draft is saved locally in this browser.': 'Prompt வரைவு இந்த உலாவியில் சேமிக்கப்பட்டது.',
+  'Prompt draft could not be saved in this browser.': 'Prompt வரைவை இந்த உலாவியில் சேமிக்க முடியவில்லை.',
+  'Write your prompt': 'உங்கள் prompt-ஐ எழுதுங்கள்',
+  'Press Enter to open all three. Use Shift+Enter for a new line.': 'மூன்றையும் திறக்க Enter அழுத்துங்கள். புதிய வரிக்கு Shift+Enter அழுத்துங்கள்.',
+  'Copy prompt': 'Prompt-ஐ நகலெடு',
+  'Clear prompt': 'Prompt-ஐ அழி',
+  'Open in all 3 AIs': 'மூன்று AI-களிலும் திற',
+  'If your browser blocks tabs, allow pop-ups or open each AI separately below.': 'உலாவி tab-களைத் தடுத்தால் pop-up-களை அனுமதிக்கவும் அல்லது கீழே ஒவ்வொரு AI-யாகத் திறக்கவும்.',
+  'Choose an AI service': 'AI சேவையைத் தேர்ந்தெடுக்கவும்',
+  'Open this service in a new tab. Your prompt is copied for you to paste.': 'இந்த சேவையைப் புதிய tab-இல் திறக்கவும். ஒட்டுவதற்காக உங்கள் prompt நகலெடுக்கப்படும்.',
+  Open: 'திற',
+  'Prompt copied. Paste it into an AI service when you are ready.': 'Prompt நகலெடுக்கப்பட்டது. தயாரானதும் AI சேவையில் ஒட்டுங்கள்.',
+  'Prompt copied. Paste it into the AI tab, then send it there.': 'Prompt நகலெடுக்கப்பட்டது. AI tab-இல் ஒட்டி, அங்கே அனுப்புங்கள்.',
+  'Prompt copied. Paste it into each AI tab, then send it there.': 'Prompt நகலெடுக்கப்பட்டது. ஒவ்வொரு AI tab-இலும் ஒட்டி, அங்கே அனுப்புங்கள்.',
+  'Could not copy the prompt. It remains saved here; select it and copy it manually.': 'Prompt-ஐ நகலெடுக்க முடியவில்லை. இது இங்கே சேமிக்கப்பட்டுள்ளது; தேர்ந்தெடுத்து கைமுறையாக நகலெடுக்கவும்.',
+  'Could not open an AI tab. Allow pop-ups and try again.': 'AI tab-ஐ திறக்க முடியவில்லை. Pop-up-களை அனுமதித்து மீண்டும் முயற்சிக்கவும்.',
+  'These services operate separately from your writing workspace. This app does not send drafts or article content when you open a tool.': 'இந்த சேவைகள் உங்கள் எழுதும் இடத்திலிருந்து தனியாக இயங்கும். கருவியைத் திறக்கும்போது உங்கள் வரைவுகள் அல்லது கட்டுரை உள்ளடக்கம் அனுப்பப்படாது.',
+  'Ask with AI': 'AI-யிடம் கேளுங்கள்',
+  'Got it': 'சரி',
+  'Google AI opens with your prompt. Gemini opens separately with the prompt copied for you to paste.': 'உங்கள் prompt உடன் Google AI திறக்கும். Gemini தனியாகத் திறக்கும்; prompt தானாக copy ஆகும், அதை அங்கே paste செய்யுங்கள்.',
+  'Expand prompt editor': 'நீளமான prompt எழுத விரிவாக்கு',
+  'Use a single-line prompt': 'ஒரே வரி prompt-க்கு மாற்று',
+  'What would you like to ask?': 'என்ன கேட்க விரும்புகிறீர்கள்?',
+  'Open this prompt in both services': 'இந்த prompt-ஐ இரு சேவைகளிலும் திற',
+  'Open both with this prompt': 'இந்த prompt-ஐ இரண்டிலும் திற',
+  'Click the arrow to open both tabs.': 'அம்புக்குறியை அழுத்தி இரு tab-களையும் திறக்கவும்.',
+  'Press Enter to open both tabs.': 'இரு tab-களையும் திற Enter அழுத்தவும்.',
+  'Prompt copied to your clipboard. Paste it into Gemini to get a response.': 'Prompt clipboard-க்கு copy ஆனது. பதிலைப் பெற Gemini-யில் paste செய்யுங்கள்.',
+  'Could not copy the prompt. Copy it here and paste it into Gemini.': 'Prompt-ஐ copy செய்ய முடியவில்லை. இங்கிருந்து copy செய்து Gemini-யில் paste செய்யுங்கள்.',
+  'Your browser blocked the new tab. Allow pop-ups and try again.': 'உங்கள் browser புதிய tab-ஐ தடுத்தது. Pop-up-களை அனுமதித்து மீண்டும் முயற்சிக்கவும்.',
+  'Your browser blocked one or more tabs. Allow pop-ups and try again.': 'உங்கள் browser சில tab-களைத் தடுத்தது. Pop-up-களை அனுமதித்து மீண்டும் முயற்சிக்கவும்.',
+  'Enter a prompt to continue.': 'தொடர prompt உள்ளிடவும்.',
+  'Ask Google AI': 'Google AI-யிடம் கேள்',
+  'Ask Gemini': 'Gemini-யிடம் கேள்',
+  'About Google AI and Gemini': 'Google AI மற்றும் Gemini பற்றி',
+  'Google AI accepts the prompt in its search link. Gemini does not support prompt-prefill links, so this app copies your prompt and opens Gemini for you to paste it.': 'Google AI, search link மூலம் prompt-ஐப் பெறும். Gemini link வழியாக prompt நிரப்புவதை ஆதரிக்காது. அதனால் இந்த app prompt-ஐ copy செய்து Gemini-ஐத் திறக்கும்; அங்கே paste செய்யுங்கள்.',
+  'Only the prompt you type here is shared. Your drafts and article content are not sent.': 'நீங்கள் இங்கே எழுதும் prompt மட்டுமே பகிரப்படும். உங்கள் draft அல்லது கட்டுரை உள்ளடக்கம் அனுப்பப்படாது.',
+})
+
+Object.assign(tamil, {
+  Highlights: 'சிறப்பம்சங்கள்',
+  'Add collection': 'தொகுப்பைச் சேர்',
+  'Collection title': 'தொகுப்பின் தலைப்பு',
+  'Highlight image': 'சிறப்பம்சப் படம்',
+  'Add a collection to keep article images and quotes together.': 'கட்டுரைப் படங்களையும் மேற்கோள்களையும் ஒன்றாக வைக்க ஒரு தொகுப்பைச் சேர்க்கவும்.',
+  Settings: 'அமைப்புகள்',
+  'Testing speed…': 'வேகம் சோதிக்கப்படுகிறது…',
+})
+Object.assign(tamil, {
+  'Weak connection': 'பலவீனமான இணைப்பு',
+  'Okay connection': 'சுமாரான இணைப்பு',
+  'Good connection': 'நல்ல இணைப்பு',
+  'Fast connection': 'வேகமான இணைப்பு',
+  Offline: 'இணையமில்லை',
+  Connected: 'இணைக்கப்பட்டுள்ளது',
+  'Connection quality unavailable': 'இணைப்பு தரம் கிடைக்கவில்லை',
+  'Network status details': 'இணைய நிலை விவரங்கள்',
+  'Close network details': 'இணைய விவரங்களை மூடு',
+  'Download speed': 'பதிவிறக்க வேகம்',
+  'Not measured': 'அளவிடப்படவில்லை',
+  Latency: 'தாமதம்',
+  "Speed tests use a temporary sample. Websites cannot read your device's cellular signal bars.": 'வேகச் சோதனை தற்காலிக மாதிரியைப் பயன்படுத்தும். இணையதளங்களால் உங்கள் சாதனத்தின் செல்லுலார் சிக்னல் அளவைப் படிக்க முடியாது.',
+  'post is saved locally and waiting to sync.': 'பதிவு உள்ளூரில் சேமிக்கப்பட்டு ஒத்திசைவுக்காகக் காத்திருக்கிறது.',
+  'posts are saved locally and waiting to sync.': 'பதிவுகள் உள்ளூரில் சேமிக்கப்பட்டு ஒத்திசைவுக்காகக் காத்திருக்கின்றன.',
+  'No upload server is connected yet; your local copy stays safe.': 'பதிவேற்ற சேவையகம் இன்னும் இணைக்கப்படவில்லை; உள்ளூர் நகல் பாதுகாப்பாக இருக்கும்.',
+  'Posts are saved in this browser. Cloud upload is not configured.': 'பதிவுகள் இந்த உலாவியில் சேமிக்கப்படுகின்றன. மேகப் பதிவேற்றம் அமைக்கப்படவில்லை.',
+  'Post saved offline. Sync is pending until an upload service is connected.': 'இணையமின்றி பதிவு சேமிக்கப்பட்டது. பதிவேற்ற சேவை இணைக்கப்படும் வரை ஒத்திசைவு காத்திருக்கும்.',
+  'Sync pending': 'ஒத்திசைவு காத்திருக்கிறது',
+  'Saving post...': 'பதிவு சேமிக்கப்படுகிறது...',
+})
+
 const english = Object.fromEntries(Object.entries(tamil).map(([key, value]) => [value, key]))
-const LanguageContext = createContext('en')
 
-export function LanguageProvider({ language, children }) {
-  return <LanguageContext.Provider value={language}>{children}</LanguageContext.Provider>
-}
-
-export function useLanguage() {
-  const language = useContext(LanguageContext)
-  const t = useCallback((text) => language === 'ta' ? (tamil[text] || text) : (english[text] || text), [language])
-  return { language, t }
+export function translate(text, language = 'en') {
+  return language === 'ta' ? (tamil[text] || text) : (english[text] || text)
 }

@@ -3,6 +3,8 @@ import { createArticle } from '../utils/article.js'
 export const WORKSPACE_KEY = 'jeyamohan-articles-workspace-v1'
 const LEGACY_DRAFT_KEY = 'ezhuthu-draft-v1'
 const WORKSPACE_RECOVERY_KEY = 'jeyamohan-articles-workspace-recovery-v1'
+const DEFAULT_PROFILE_NAME = 'Jeyamohan'
+const LEGACY_DEFAULT_PROFILE_NAMES = new Set(['ஜெயமோகன்', 'ஜெய஺eோகன்'])
 let lastObservedWorkspaceRaw
 let workspaceBaselineLoaded = false
 let workspaceWriteConflict = false
@@ -15,6 +17,17 @@ const defaultWorkspace = () => ({
 })
 
 const isRecord = (value) => value !== null && typeof value === 'object' && !Array.isArray(value)
+const dateOrDefault = (date, fallback) => typeof date === 'string' && Number.isFinite(Date.parse(date)) ? date : fallback
+
+function normalizeProfile(value, defaults) {
+  const profile = isRecord(value) ? value : {}
+  const name = typeof profile.name === 'string' ? profile.name : defaults.name
+  return {
+    name: LEGACY_DEFAULT_PROFILE_NAMES.has(name) ? defaults.name : name,
+    bio: typeof profile.bio === 'string' ? profile.bio : '',
+    avatar: typeof profile.avatar === 'string' && profile.avatar ? profile.avatar : defaults.avatar,
+  }
+}
 
 function parseStorageValue(key) {
   try {
@@ -73,10 +86,11 @@ function normalizeArticle(value) {
     seoTitle: typeof value.seoTitle === 'string' ? value.seoTitle : '',
     seoDescription: typeof value.seoDescription === 'string' ? value.seoDescription : '',
     slug: typeof value.slug === 'string' ? value.slug : '',
+    archived: value.archived === true,
+    archivedAt: value.archived === true ? dateOrDefault(value.archivedAt, null) : null,
   })
   if (typeof article.id !== 'string' || !article.id.trim()) article.id = createArticle().id
   if (!['draft', 'scheduled', 'published'].includes(article.status)) article.status = 'draft'
-  const dateOrDefault = (date, fallback) => typeof date === 'string' && Number.isFinite(Date.parse(date)) ? date : fallback
   article.createdAt = dateOrDefault(article.createdAt, new Date().toISOString())
   article.updatedAt = dateOrDefault(article.updatedAt, article.createdAt)
   article.scheduledAt = dateOrDefault(article.scheduledAt, null)
@@ -99,6 +113,7 @@ function readLegacyDraft() {
 
 export function loadWorkspace() {
   const defaults = defaultWorkspace()
+  defaults.profile.name = DEFAULT_PROFILE_NAME
   const stored = parseStorageValue(WORKSPACE_KEY)
   lastObservedWorkspaceRaw = stored.raw
   workspaceBaselineLoaded = true
@@ -113,18 +128,14 @@ export function loadWorkspace() {
   if (stored.found && stored.valid && isRecord(stored.value)) {
     const parsed = stored.value
     if (Array.isArray(parsed.articles)) {
-      const savedProfile = isRecord(parsed.profile) ? parsed.profile : {}
+      const seenArticleIds = new Set()
       return {
-        profile: {
-          name: typeof savedProfile.name === 'string' ? savedProfile.name : defaults.profile.name,
-          bio: typeof savedProfile.bio === 'string' ? savedProfile.bio : '',
-          avatar: typeof savedProfile.avatar === 'string' && savedProfile.avatar ? savedProfile.avatar : defaults.profile.avatar,
-        },
-        articles: parsed.articles.map((article, index) => {
+        profile: normalizeProfile(parsed.profile, defaults.profile),
+        articles: parsed.articles.map((article) => {
           const normalized = normalizeArticle(article)
-          if (isRecord(article) && typeof article.id === 'string' && article.id.trim()
-            && parsed.articles.slice(0, index).some((previous) => previous?.id === article.id)) {
-            normalized.id = createArticle().id
+          if (isRecord(article) && typeof article.id === 'string' && article.id.trim()) {
+            if (seenArticleIds.has(article.id)) normalized.id = createArticle().id
+            else seenArticleIds.add(article.id)
           }
           return normalized
         }),
@@ -134,13 +145,8 @@ export function loadWorkspace() {
     // Older versions stored one draft at the workspace root instead of an articles array.
     const rootDraft = normalizeLegacyDraft(parsed)
     if (rootDraft) {
-      const savedProfile = isRecord(parsed.profile) ? parsed.profile : {}
       return {
-        profile: {
-          name: typeof savedProfile.name === 'string' ? savedProfile.name : defaults.profile.name,
-          bio: typeof savedProfile.bio === 'string' ? savedProfile.bio : '',
-          avatar: typeof savedProfile.avatar === 'string' && savedProfile.avatar ? savedProfile.avatar : defaults.profile.avatar,
-        },
+        profile: normalizeProfile(parsed.profile, defaults.profile),
         articles: [rootDraft],
       }
     }

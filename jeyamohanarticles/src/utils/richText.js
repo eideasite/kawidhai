@@ -1,14 +1,16 @@
 import DOMPurify from 'dompurify'
 
-const ALLOWED_TAGS = new Set(['P', 'DIV', 'BR', 'STRONG', 'B', 'EM', 'I', 'U', 'S', 'SPAN', 'H1', 'H2', 'H3', 'UL', 'OL', 'LI', 'BLOCKQUOTE', 'PRE', 'CODE', 'HR', 'A', 'IMG'])
+const ALLOWED_TAGS = ['P', 'DIV', 'BR', 'STRONG', 'B', 'EM', 'I', 'U', 'S', 'SPAN', 'H1', 'H2', 'H3', 'UL', 'OL', 'LI', 'BLOCKQUOTE', 'PRE', 'CODE', 'HR', 'A', 'IMG']
 const SANITIZE_OPTIONS = {
-  ALLOWED_TAGS: [...ALLOWED_TAGS].map((tag) => tag.toLowerCase()),
+  ALLOWED_TAGS: ALLOWED_TAGS.map((tag) => tag.toLowerCase()),
   ALLOWED_ATTR: ['href', 'src', 'alt', 'data-text-size'],
   ALLOW_DATA_ATTR: false,
   ALLOW_ARIA_ATTR: false,
   FORBID_TAGS: ['script', 'style', 'iframe', 'object', 'embed', 'svg', 'math', 'form'],
   RETURN_TRUSTED_TYPE: false,
 }
+const HTML_ESCAPES = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }
+const MAX_INLINE_IMAGE_URL_LENGTH = 5_600_000
 
 export function isRichTextHtml(value = '') {
   return typeof value === 'string'
@@ -16,9 +18,7 @@ export function isRichTextHtml(value = '') {
 }
 
 export function escapeHtml(value = '') {
-  return String(value).replace(/[&<>"']/g, (character) => ({
-    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
-  })[character])
+  return String(value).replace(/[&<>"']/g, (character) => HTML_ESCAPES[character])
 }
 
 function isSafeUrl(value, image = false) {
@@ -27,7 +27,8 @@ function isSafeUrl(value, image = false) {
     const code = character.charCodeAt(0)
     return code <= 31 || code === 127
   })) return false
-  if (image && /^data:image\/(?:png|jpeg|gif|webp);base64,[A-Za-z0-9+/]+={0,2}$/i.test(candidate) && candidate.length <= 1500000) return true
+  if (image && /^data:image\/(?:png|jpeg|gif|webp);base64,[A-Za-z0-9+/]+={0,2}$/i.test(candidate)
+    && candidate.length <= MAX_INLINE_IMAGE_URL_LENGTH) return true
   try {
     const url = new URL(candidate, window.location.origin)
     if (url.username || url.password) return false
