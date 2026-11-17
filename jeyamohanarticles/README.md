@@ -18,6 +18,7 @@ npm.cmd run build
 ## Local-only behavior
 
 - Profiles, drafts, bookmarks, Home Shortcuts, highlights, article status, SEO fields, and scheduled times are stored in this browser's `localStorage`. Posts and attached images use IndexedDB, with legacy `localStorage` migration and fallback.
+- The app font preference (Inter, Times New Roman, Arial, or Open Sans) is saved in this browser. Inter and Open Sans are bundled locally; Tamil text uses available device/browser fonts.
 - Posts created while offline are saved on this device and marked as sync pending. There is no upload server configured, so they are not sent or automatically retried to a remote service.
 - The legacy writer draft (`ezhuthu-draft-v1`) remains supported and is not deleted during loading.
 - Publishing and scheduling only change local article status. They do not publish or schedule work on an external service.

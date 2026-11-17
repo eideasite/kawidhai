@@ -4,9 +4,9 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
   Archive,
-  ArrowUpRight,
   Bookmark,
   Check,
+  ChevronLeft,
   ChevronRight,
   Clock3,
   Copy,
@@ -18,13 +18,16 @@ import {
   Pin,
   Plus,
   RotateCcw,
+  Search,
   Send,
+  Smile,
   Sparkles,
   Trash2,
   X,
 } from 'lucide-vue-next'
 import { useWorkspace } from '../stores/workspace.js'
 import { articleCanPublish } from '../utils/validation.js'
+import { createId } from '../utils/createId.js'
 import { createArticleHighlight, createHighlightCollection } from '../services/highlightStorage.js'
 import { formatDate } from '../utils/formatDate.js'
 import { getArticleExcerpt, getArticleTitle, getWordCount } from '../utils/article.js'
@@ -33,7 +36,10 @@ import { publishLocally, scheduleLocally } from '../services/publishingService.j
 import { makeSafeFilename } from '../utils/article.js'
 import { translate } from '../i18n.js'
 import HomeHighlightsSection from '../components/home/HomeHighlightsSection.vue'
+import LoadingDots from '../components/common/LoadingDots.vue'
+import AiProviderPicker from '../components/common/AiProviderPicker.vue'
 import ProfileAvatar from '../components/common/ProfileAvatar.vue'
+import { AI_PROVIDERS, openAiProviderTabs } from '../services/aiSearch.js'
 
 const route = useRoute()
 const router = useRouter()
@@ -58,6 +64,9 @@ const {
 const postText = ref('')
 const postImage = ref(null)
 const postSaving = ref(false)
+const postDialogOpen = ref(false)
+const postTextArea = ref(null)
+const emojiPickerOpen = ref(false)
 const imageInput = ref(null)
 const recognition = ref(null)
 const dictating = ref(false)
@@ -68,31 +77,47 @@ const scheduledAt = ref('')
 const showAllPosts = ref(false)
 const highlightText = ref('')
 const selectedCollectionId = ref('')
+const highlightManagerView = ref('closed')
+const highlightDraft = ref(null)
+const highlightImageInput = ref(null)
+const highlightPhotosLoading = ref(false)
 const profileForm = ref({ ...workspace.value.profile })
 const externalAiPrompt = ref('')
+const externalAiPromptSearching = ref(false)
 const externalAiPromptStorageError = ref(false)
+const externalAiProviderPickerOpen = ref(false)
+const externalAiPendingPrompt = ref('')
+const mobileViewportQuery = window.matchMedia('(max-width: 700px)')
+const mobileViewport = ref(mobileViewportQuery.matches)
 const avatarOptions = ['✍️', '🙂', '😊', '🌿', '📚', '✨', '🖋️']
-const accessibility = ref({ fontScale: 1, boldText: false, outlineText: false })
+const fontFamilyOptions = [
+  { value: 'inter', label: 'Inter', css: "'Inter', 'Noto Sans Tamil', 'Latha', 'Nirmala UI', system-ui, sans-serif" },
+  { value: 'times-new-roman', label: 'Times New Roman', css: "'Times New Roman', 'Noto Sans Tamil', 'Latha', 'Nirmala UI', serif" },
+  { value: 'arial', label: 'Arial', css: "Arial, 'Noto Sans Tamil', 'Latha', 'Nirmala UI', sans-serif" },
+  { value: 'open-sans', label: 'Open Sans', css: "'Open Sans', 'Noto Sans Tamil', 'Latha', 'Nirmala UI', sans-serif" },
+]
+function getFontFamilyOption(value) {
+  return fontFamilyOptions.find((option) => option.value === value) || fontFamilyOptions[0]
+}
+const accessibility = ref({ fontScale: 1, fontFamily: 'inter', boldText: false, outlineText: false })
 const message = ref('')
 const messageTimer = ref()
 const externalAiPromptStorageKey = 'jeyamohan-external-ai-prompt-v1'
-const externalAiProviders = [
-  { name: 'Google Gemini', url: 'https://gemini.google.com/' },
-  { name: 'ChatGPT', url: 'https://chatgpt.com/' },
-  { name: 'Meta AI', url: 'https://www.meta.ai/' },
-]
+const externalAiProviders = AI_PROVIDERS
+const postEmojis = ['🙂', '😊', '❤️', '😂', '🙏', '✨']
 
 try {
   const savedAccessibility = JSON.parse(localStorage.getItem('jeyamohan-accessibility-settings-v1') || 'null')
   if (savedAccessibility && typeof savedAccessibility === 'object') {
     accessibility.value = {
       fontScale: Number.isFinite(savedAccessibility.fontScale) ? Math.min(1.3, Math.max(0.9, savedAccessibility.fontScale)) : 1,
+      fontFamily: getFontFamilyOption(savedAccessibility.fontFamily).value,
       boldText: savedAccessibility.boldText === true,
       outlineText: savedAccessibility.outlineText === true,
     }
   }
 } catch {
-  accessibility.value = { fontScale: 1, boldText: false, outlineText: false }
+  accessibility.value = { fontScale: 1, fontFamily: 'inter', boldText: false, outlineText: false }
 }
 
 const page = computed(() => String(route.name || 'not-found'))
@@ -137,6 +162,7 @@ const highlightedCollection = computed(() => highlights.value.find((item) => ite
 
 watch(accessibility, (settings) => {
   document.documentElement.style.setProperty('--app-font-scale', String(settings.fontScale))
+  document.documentElement.style.setProperty('--app-font-family', getFontFamilyOption(settings.fontFamily).css)
   document.documentElement.classList.toggle('accessibility-bold', settings.boldText)
   document.documentElement.classList.toggle('accessibility-outline', settings.outlineText)
   try {
@@ -150,6 +176,10 @@ function showMessage(text) {
   message.value = text
   window.clearTimeout(messageTimer.value)
   messageTimer.value = window.setTimeout(() => { message.value = '' }, 3500)
+}
+
+function updateMobileViewport() {
+  mobileViewport.value = mobileViewportQuery.matches
 }
 
 try {
@@ -170,7 +200,47 @@ watch(externalAiPrompt, (prompt) => {
 function handleExternalAiPromptKeydown(event) {
   if (event.key !== 'Enter' || event.shiftKey || event.isComposing || !externalAiPrompt.value.trim()) return
   event.preventDefault()
-  openExternalAiTools(externalAiProviders)
+  openPromptInAllAiTools()
+}
+
+async function openPromptInAllAiTools() {
+  if (externalAiPromptSearching.value) return
+  const prompt = externalAiPrompt.value
+  if (!prompt.trim()) {
+    showMessage(t('Enter a prompt to continue.'))
+    return
+  }
+
+  if (window.matchMedia('(max-width: 700px)').matches) {
+    externalAiPendingPrompt.value = prompt
+    externalAiProviderPickerOpen.value = true
+    return
+  }
+
+  openPromptWithProviders(prompt)
+}
+
+function openPromptWithProvider(provider) {
+  const prompt = externalAiPendingPrompt.value
+  externalAiProviderPickerOpen.value = false
+  externalAiPendingPrompt.value = ''
+  openPromptWithProviders(prompt, [provider])
+}
+
+async function openPromptWithProviders(prompt, providers = AI_PROVIDERS) {
+  externalAiPromptSearching.value = true
+  try {
+    await openAiProviderTabs(prompt, providers)
+    showMessage(providers.length === 1
+      ? t('Copied your prompt and opened {provider}. Paste it there.').replace('{provider}', providers[0].name)
+      : t('Copied to clipboard and opened all 3 AI tabs. Paste in each tab.'))
+  } catch {
+    showMessage(providers.length === 1
+      ? t('Could not open the AI or copy your prompt. Allow pop-ups and clipboard access, then try again.')
+      : t('Could not open all 3 AI tabs or copy your text. Allow pop-ups and clipboard access, then try again.'))
+  } finally {
+    externalAiPromptSearching.value = false
+  }
 }
 
 function copyTextToClipboard(text) {
@@ -196,8 +266,8 @@ async function copyPost(post) {
 }
 
 function copyExternalAiPrompt() {
-  const prompt = externalAiPrompt.value.trim()
-  if (!prompt) {
+  const prompt = externalAiPrompt.value
+  if (!prompt.trim()) {
     showMessage('Enter a prompt to continue.')
     return
   }
@@ -207,8 +277,8 @@ function copyExternalAiPrompt() {
 }
 
 function openExternalAiTools(providers) {
-  const prompt = externalAiPrompt.value.trim()
-  if (!prompt) {
+  const prompt = externalAiPrompt.value
+  if (!prompt.trim()) {
     showMessage('Enter a prompt to continue.')
     return
   }
@@ -216,7 +286,12 @@ function openExternalAiTools(providers) {
   let openFailed = false
   for (const provider of providers) {
     try {
-      window.open(provider.url, '_blank', 'noopener,noreferrer')
+      const tab = window.open(provider.url, '_blank')
+      if (!tab) {
+        openFailed = true
+      } else {
+        tab.opener = null
+      }
     } catch {
       openFailed = true
     }
@@ -256,6 +331,33 @@ function closeDialog() {
   dialog.value = null
 }
 
+async function openPostDialog() {
+  if (postSaving.value) return
+  postDialogOpen.value = true
+  emojiPickerOpen.value = false
+  await nextTick()
+  postTextArea.value?.focus()
+}
+
+function closePostDialog() {
+  if (postSaving.value) return
+  if (dictating.value) recognition.value?.stop()
+  dictating.value = false
+  postDialogOpen.value = false
+  emojiPickerOpen.value = false
+}
+
+async function insertPostEmoji(emoji) {
+  const textarea = postTextArea.value
+  const start = textarea?.selectionStart ?? postText.value.length
+  const end = textarea?.selectionEnd ?? postText.value.length
+  postText.value = `${postText.value.slice(0, start)}${emoji}${postText.value.slice(end)}`
+  emojiPickerOpen.value = false
+  await nextTick()
+  textarea?.focus()
+  textarea?.setSelectionRange(start + emoji.length, start + emoji.length)
+}
+
 function updateProfile() {
   const name = profileForm.value.name.trim()
   if (!name) {
@@ -283,11 +385,14 @@ function handlePostImage(event) {
 
 async function submitPost() {
   if (postSaving.value || (!postText.value.trim() && !postImage.value)) return
+  if (dictating.value) recognition.value?.stop()
+  dictating.value = false
   const submittedText = postText.value
   const submittedImage = postImage.value
   const savedOffline = !navigator.onLine
   postSaving.value = true
   try {
+    await new Promise((resolve) => window.setTimeout(resolve, 3000))
     if (!await createPost({
       text: submittedText,
       image: submittedImage,
@@ -298,6 +403,7 @@ async function submitPost() {
     }
     if (postText.value === submittedText) postText.value = ''
     if (postImage.value === submittedImage) postImage.value = null
+    postDialogOpen.value = false
     showMessage(savedOffline ? 'Post saved offline. Sync is pending until an upload service is connected.' : 'Post saved in this browser.')
   } finally {
     postSaving.value = false
@@ -326,7 +432,9 @@ function toggleDictation() {
         .map((result) => result[0]?.transcript || '')
         .join(' ')
         .trim()
-      if (transcript) postText.value = `${postText.value}${postText.value && !/\s$/.test(postText.value) ? ' ' : ''}${transcript}`
+      if (transcript && dictating.value && !postSaving.value) {
+        postText.value = `${postText.value}${postText.value && !/\s$/.test(postText.value) ? ' ' : ''}${transcript}`
+      }
     }
     activeRecognition.onerror = (event) => {
       dictating.value = false
@@ -407,17 +515,117 @@ function saveHighlight() {
   }
 }
 
-function addHighlightCollection() {
-  const collection = createHighlightCollection()
-  collection.title = `Highlights ${highlights.value.length + 1}`
-  if (saveHighlightCollections([...highlights.value, collection])) selectedCollectionId.value = collection.id
+function openHighlightManager() {
+  highlightDraft.value = null
+  highlightManagerView.value = 'list'
 }
 
-function updateHighlightTitle(collectionId, title) {
-  const normalizedTitle = title.trim()
-  if (!normalizedTitle) return false
-  const next = highlights.value.map((item) => item.id === collectionId ? { ...item, title: normalizedTitle, updatedAt: new Date().toISOString() } : item)
-  saveHighlightCollections(next)
+function closeHighlightManager() {
+  if (highlightPhotosLoading.value) return
+  highlightDraft.value = null
+  highlightManagerView.value = 'closed'
+}
+
+function startHighlightCollection() {
+  const collection = createHighlightCollection()
+  highlightDraft.value = { ...collection, title: '', articleHighlights: [] }
+  highlightManagerView.value = 'editor'
+}
+
+function editHighlightCollection(collection) {
+  highlightDraft.value = {
+    ...collection,
+    items: collection.items.map((item) => ({ ...item })),
+    articleHighlights: [...(collection.articleHighlights || [])],
+  }
+  highlightManagerView.value = 'editor'
+}
+
+function returnToHighlightList() {
+  if (highlightPhotosLoading.value) return
+  highlightDraft.value = null
+  highlightManagerView.value = 'list'
+}
+
+function readHighlightImage(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => {
+      if (typeof reader.result !== 'string') {
+        reject(new Error('Could not read that image.'))
+        return
+      }
+      resolve({ id: createId('highlight-image'), src: reader.result, name: file.name })
+    }
+    reader.onerror = () => reject(new Error('Could not read that image.'))
+    reader.readAsDataURL(file)
+  })
+}
+
+async function handleHighlightPhotos(event) {
+  const files = Array.from(event.target.files || [])
+  event.target.value = ''
+  if (!files.length || !highlightDraft.value || highlightPhotosLoading.value) return
+
+  const supportedTypes = ['image/png', 'image/jpeg', 'image/gif', 'image/webp']
+  const validFiles = files.filter((file) => supportedTypes.includes(file.type) && file.size <= 4 * 1024 * 1024)
+  const remainingSlots = 8 - highlightDraft.value.items.length
+  const chosenFiles = validFiles.slice(0, remainingSlots)
+  if (validFiles.length !== files.length) {
+    showMessage(t('Choose PNG, JPEG, GIF, or WebP images up to 4 MB each.'))
+  } else if (validFiles.length > remainingSlots) {
+    showMessage(t('A highlight collection can include up to 8 photos.'))
+  }
+  if (!chosenFiles.length) return
+
+  highlightPhotosLoading.value = true
+  try {
+    const images = await Promise.all(chosenFiles.map(readHighlightImage))
+    if (highlightDraft.value) {
+      highlightDraft.value = {
+        ...highlightDraft.value,
+        items: [...highlightDraft.value.items, ...images],
+      }
+    }
+  } catch (error) {
+    showMessage(t(error?.message || 'Could not read that image.'))
+  } finally {
+    highlightPhotosLoading.value = false
+  }
+}
+
+function removeHighlightPhoto(imageId) {
+  if (!highlightDraft.value || highlightPhotosLoading.value) return
+  highlightDraft.value = {
+    ...highlightDraft.value,
+    items: highlightDraft.value.items.filter((item) => item.id !== imageId),
+  }
+}
+
+function saveHighlightCollection() {
+  const draft = highlightDraft.value
+  if (!draft) return
+  const title = draft.title.trim()
+  if (!title) {
+    showMessage(t('Add a title for this highlight.'))
+    return
+  }
+  if (!draft.items.length && !draft.articleHighlights.length) {
+    showMessage(t('Add at least one photo or saved quote.'))
+    return
+  }
+
+  const collection = { ...draft, title, updatedAt: new Date().toISOString() }
+  const exists = highlights.value.some((item) => item.id === collection.id)
+  const next = exists
+    ? highlights.value.map((item) => item.id === collection.id ? collection : item)
+    : [collection, ...highlights.value]
+  if (saveHighlightCollections(next)) {
+    selectedCollectionId.value = collection.id
+    highlightDraft.value = null
+    highlightManagerView.value = 'closed'
+    showMessage(t('Highlight collection saved.'))
+  }
 }
 
 function resolveDialog() {
@@ -511,11 +719,13 @@ watch(() => workspace.value.profile, (value) => {
 
 onMounted(() => {
   if (!selectedCollectionId.value && highlights.value.length) selectedCollectionId.value = highlights.value[0].id
+  mobileViewportQuery.addEventListener('change', updateMobileViewport)
 })
 
 onBeforeUnmount(() => {
   window.clearTimeout(messageTimer.value)
   recognition.value?.stop()
+  mobileViewportQuery.removeEventListener('change', updateMobileViewport)
 })
 </script>
 
@@ -538,41 +748,27 @@ onBeforeUnmount(() => {
 
     <section
       class="composer-card surface-card"
-      aria-labelledby="create-post-title"
+      :aria-label="t('Create post')"
     >
-      <div class="section-title-row">
-        <h1 id="create-post-title">
-          {{ t('Create post') }}
-        </h1><span class="local-badge">{{ t('Saved in this browser') }}</span>
-      </div>
-      <textarea
-        v-model="postText"
-        rows="3"
-        :placeholder="composerPlaceholder"
-        :aria-label="t('Write your post')"
-      />
-      <div
-        v-if="postImage"
-        class="selected-image"
-      >
-        <img
-          :src="postImage.src"
-          :alt="postImage.name || 'Post image'"
-        >
+      <div class="composer-trigger-row">
+        <ProfileAvatar
+          :profile="workspace.profile"
+          size="small"
+        />
         <button
-          class="icon-button"
+          class="composer-open-button"
           type="button"
-          aria-label="Remove image"
-          @click="postImage = null"
+          :aria-label="t('Write a post')"
+          @click="openPostDialog"
         >
-          <X :size="16" />
+          {{ composerPlaceholder }}
         </button>
       </div>
       <div class="composer-actions">
         <button
           class="text-button"
           type="button"
-          @click="imageInput?.click()"
+          @click="openPostDialog"
         >
           <ImagePlus :size="17" /> {{ t('Photo') }}
         </button>
@@ -583,29 +779,6 @@ onBeforeUnmount(() => {
         >
           <FilePlus2 :size="17" /> {{ t('Write article') }}
         </button>
-        <button
-          class="text-button"
-          type="button"
-          :aria-pressed="dictating"
-          @click="toggleDictation"
-        >
-          <Mic :size="17" /> {{ dictating ? 'Stop dictation' : 'Voice dictation' }}
-        </button>
-        <button
-          class="button button-primary"
-          type="button"
-          :disabled="postSaving || (!postText.trim() && !postImage)"
-          @click="submitPost"
-        >
-          <Send :size="16" /> {{ t(postSaving ? 'Saving post...' : 'Post') }}
-        </button>
-        <input
-          ref="imageInput"
-          class="visually-hidden"
-          type="file"
-          accept="image/png,image/jpeg,image/gif,image/webp"
-          @change="handlePostImage"
-        >
       </div>
     </section>
 
@@ -670,8 +843,8 @@ onBeforeUnmount(() => {
       :collections="highlights"
       :articles="workspace.articles"
       :language="language"
-      @add-collection="addHighlightCollection"
-      @update-title="updateHighlightTitle"
+      @open-manager="openHighlightManager"
+      @edit-collection="editHighlightCollection"
       @open-article="openArticle"
     />
 
@@ -788,8 +961,8 @@ onBeforeUnmount(() => {
       :collections="highlights"
       :articles="workspace.articles"
       :language="language"
-      @add-collection="addHighlightCollection"
-      @update-title="updateHighlightTitle"
+      @open-manager="openHighlightManager"
+      @edit-collection="editHighlightCollection"
       @open-article="openArticle"
     />
   </div>
@@ -852,6 +1025,14 @@ onBeforeUnmount(() => {
       </div>
       <details class="additional-settings">
         <summary>Additional Settings</summary>
+        <label class="setting-row"><span><strong>{{ t('Font family') }}</strong><small>{{ t('Choose the app font.') }}</small></span><select
+          v-model="accessibility.fontFamily"
+          :aria-label="t('Font family')"
+        ><option
+          v-for="font in fontFamilyOptions"
+          :key="font.value"
+          :value="font.value"
+        >{{ font.label }}</option></select></label>
         <label class="setting-row"><span><strong>Font size</strong><small>Make text easier to read.</small></span><input
           v-model.number="accessibility.fontScale"
           type="range"
@@ -1031,7 +1212,7 @@ onBeforeUnmount(() => {
             <button
               class="text-button"
               type="button"
-              @click="addHighlightCollection"
+              @click="startHighlightCollection"
             >
               <Plus :size="16" /> Create a collection
             </button>
@@ -1067,7 +1248,7 @@ onBeforeUnmount(() => {
             <button
               class="text-button"
               type="button"
-              @click="addHighlightCollection"
+              @click="startHighlightCollection"
             >
               <Plus :size="16" /> New collection
             </button>
@@ -1311,25 +1492,21 @@ onBeforeUnmount(() => {
     <div class="page-heading">
       <span class="eyebrow">{{ t('External tools') }}</span>
       <h1>{{ t('External AI tools') }}</h1>
-      <p>{{ t('Write one prompt, then open a provider or all three. Your prompt is saved in this browser and copied only when you choose an AI action.') }}</p>
     </div>
     <section
       class="surface-card external-ai-prompt-card"
       aria-labelledby="external-ai-prompt-heading"
     >
       <div class="external-ai-prompt-heading">
-        <div>
-          <h2 id="external-ai-prompt-heading">
-            {{ t('Prompt canvas') }}
-          </h2>
-          <p>{{ t('Your posts and article drafts are never included. Paste the copied prompt into an AI service and send it there yourself.') }}</p>
-        </div>
+        <h2 id="external-ai-prompt-heading">
+          {{ t('Prompt canvas') }}
+        </h2>
         <span
           class="external-ai-saved-state"
           :class="{ 'has-error': externalAiPromptStorageError }"
           aria-live="polite"
         >
-          {{ externalAiPromptStorageError ? t('Prompt draft could not be saved in this browser.') : t('Prompt draft is saved locally in this browser.') }}
+          {{ externalAiPromptStorageError ? t('Could not save') : t('Saved in this browser') }}
         </span>
       </div>
       <label
@@ -1343,17 +1520,17 @@ onBeforeUnmount(() => {
         v-model="externalAiPrompt"
         class="external-ai-prompt-input"
         :placeholder="t('What would you like to ask?')"
-        rows="8"
+        rows="4"
         @keydown="handleExternalAiPromptKeydown"
       />
       <div class="external-ai-prompt-footer">
-        <span class="external-ai-prompt-hint">{{ t('Press Enter to open all three. Use Shift+Enter for a new line.') }}</span>
+        <span class="external-ai-prompt-hint">{{ t('Enter opens AI tools and copies your prompt. Shift+Enter adds a line.') }}</span>
         <span class="external-ai-character-count">{{ externalAiPrompt.length.toLocaleString() }}</span>
       </div>
       <div class="external-ai-main-actions">
         <div class="external-ai-secondary-actions">
           <button
-            class="button button-secondary"
+            class="button button-secondary ai-hover-button"
             type="button"
             @click="copyExternalAiPrompt"
           >
@@ -1370,18 +1547,33 @@ onBeforeUnmount(() => {
           </button>
         </div>
         <button
-          class="button button-primary external-ai-open-all"
+          class="button button-primary external-ai-search-button ai-hover-button"
           type="button"
-          @click="openExternalAiTools(externalAiProviders)"
+          :disabled="externalAiPromptSearching || !externalAiPrompt.trim()"
+          :aria-label="t(externalAiPromptSearching ? (mobileViewport ? 'Opening AI...' : 'Opening 3 AIs...') : (mobileViewport ? 'Choose an AI' : 'Open in all 3 AIs'))"
+          :aria-busy="externalAiPromptSearching"
+          @click="openPromptInAllAiTools"
         >
-          <ArrowUpRight :size="17" />
-          {{ t('Open in all 3 AIs') }}
+          <template v-if="externalAiPromptSearching">
+            {{ t(mobileViewport ? 'Opening AI...' : 'Opening 3 AIs...') }}
+            <LoadingDots />
+          </template>
+          <template v-else>
+            <Search :size="16" />
+            {{ t(mobileViewport ? 'Choose an AI' : 'Open in all 3 AIs') }}
+          </template>
         </button>
       </div>
     </section>
-    <p class="external-ai-popup-note">
-      {{ t('If your browser blocks tabs, allow pop-ups or open each AI separately below.') }}
-    </p>
+    <AiProviderPicker
+      v-if="externalAiProviderPickerOpen"
+      :providers="externalAiProviders"
+      :title="t('Which AI would you like to use?')"
+      :description="t('Choose one AI to open. Your prompt will be copied for you.')"
+      :cancel-label="t('Cancel')"
+      @select="openPromptWithProvider"
+      @cancel="externalAiProviderPickerOpen = false"
+    />
     <section
       class="external-ai-provider-grid"
       :aria-label="t('Choose an AI service')"
@@ -1398,11 +1590,9 @@ onBeforeUnmount(() => {
           <Sparkles :size="19" />
         </span>
         <h2>{{ provider.name }}</h2>
-        <p>
-          {{ t('Open this service in a new tab. Your prompt is copied for you to paste.') }}
-        </p>
+        <p>{{ t('Open in a new tab.') }}</p>
         <button
-          class="button button-secondary"
+          class="button button-secondary ai-hover-button"
           type="button"
           @click="openExternalAiTools([provider])"
         >
@@ -1425,6 +1615,355 @@ onBeforeUnmount(() => {
       >
         Back to home
       </button>
+    </section>
+  </div>
+
+  <div
+    v-if="postDialogOpen"
+    class="dialog-backdrop"
+    @click.self="closePostDialog"
+  >
+    <section
+      class="app-dialog surface-card post-create-dialog"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="post-dialog-title"
+      :aria-busy="postSaving"
+      tabindex="-1"
+    >
+      <div class="post-modal-heading">
+        <h2 id="post-dialog-title">
+          {{ t('Create post') }}
+        </h2>
+        <button
+          class="icon-button"
+          type="button"
+          :aria-label="t('Close dialog')"
+          :disabled="postSaving"
+          @click="closePostDialog"
+        >
+          <X :size="18" />
+        </button>
+      </div>
+      <div class="post-modal-author">
+        <ProfileAvatar
+          :profile="workspace.profile"
+          size="small"
+        />
+        <strong>{{ profileName }}</strong>
+      </div>
+      <textarea
+        ref="postTextArea"
+        v-model="postText"
+        class="post-modal-textarea"
+        rows="5"
+        :placeholder="composerPlaceholder"
+        :aria-label="t('Write your post')"
+        :disabled="postSaving"
+      />
+      <div
+        v-if="postImage"
+        class="selected-image post-modal-image"
+      >
+        <img
+          :src="postImage.src"
+          :alt="postImage.name || t('Post image')"
+        >
+        <button
+          class="icon-button"
+          type="button"
+          :aria-label="t('Remove image')"
+          :disabled="postSaving"
+          @click="postImage = null"
+        >
+          <X :size="16" />
+        </button>
+      </div>
+      <div
+        v-if="postSaving"
+        class="post-progress"
+        role="status"
+        aria-live="polite"
+      >
+        <LoadingDots />
+        <span>{{ t('Posting...') }}</span>
+      </div>
+      <div class="post-add-toolbar">
+        <strong>{{ t('Add to your post') }}</strong>
+        <div class="post-add-actions">
+          <button
+            class="icon-button post-add-photo"
+            type="button"
+            :aria-label="t('Add an image')"
+            :disabled="postSaving"
+            @click="imageInput?.click()"
+          >
+            <ImagePlus :size="20" />
+          </button>
+          <button
+            class="icon-button post-add-mic"
+            type="button"
+            :aria-label="t(dictating ? 'Stop dictation' : 'Voice dictation')"
+            :aria-pressed="dictating"
+            :disabled="postSaving"
+            @click="toggleDictation"
+          >
+            <Mic :size="20" />
+          </button>
+          <button
+            class="icon-button post-add-emoji"
+            type="button"
+            :aria-label="t('Add an emoji')"
+            :aria-expanded="emojiPickerOpen"
+            :disabled="postSaving"
+            @click="emojiPickerOpen = !emojiPickerOpen"
+          >
+            <Smile :size="20" />
+          </button>
+        </div>
+      </div>
+      <div
+        v-if="emojiPickerOpen"
+        class="post-emoji-picker"
+        role="group"
+        :aria-label="t('Choose an emoji')"
+      >
+        <button
+          v-for="emoji in postEmojis"
+          :key="emoji"
+          class="post-emoji-option"
+          type="button"
+          :aria-label="emoji"
+          @click="insertPostEmoji(emoji)"
+        >
+          {{ emoji }}
+        </button>
+      </div>
+      <button
+        class="button button-primary post-submit-button"
+        type="button"
+        :disabled="postSaving || (!postText.trim() && !postImage)"
+        @click="submitPost"
+      >
+        {{ t('Post') }}
+      </button>
+      <p class="post-local-note">
+        {{ t('This creates a local post in this browser only.') }}
+      </p>
+      <input
+        ref="imageInput"
+        class="visually-hidden"
+        type="file"
+        accept="image/png,image/jpeg,image/gif,image/webp"
+        @change="handlePostImage"
+      >
+    </section>
+  </div>
+
+  <div
+    v-if="highlightManagerView === 'list'"
+    class="dialog-backdrop"
+    @click.self="closeHighlightManager"
+  >
+    <section
+      class="app-dialog surface-card highlight-manager-dialog"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="highlight-manager-title"
+    >
+      <div class="dialog-title-row">
+        <h2 id="highlight-manager-title">
+          {{ t('Edit highlights') }}
+        </h2>
+        <button
+          class="icon-button"
+          type="button"
+          :aria-label="t('Close dialog')"
+          @click="closeHighlightManager"
+        >
+          <X :size="18" />
+        </button>
+      </div>
+      <button
+        class="button button-primary highlight-add-button"
+        type="button"
+        @click="startHighlightCollection"
+      >
+        <Plus :size="17" /> {{ t('Add new') }}
+      </button>
+      <div
+        v-if="highlights.length"
+        class="highlight-manager-list"
+      >
+        <button
+          v-for="collection in highlights"
+          :key="collection.id"
+          class="highlight-manager-item"
+          type="button"
+          @click="editHighlightCollection(collection)"
+        >
+          <img
+            v-if="collection.items[0]?.src"
+            :src="collection.items[0].src"
+            :alt="collection.items[0].name || t('Highlight image')"
+          >
+          <span
+            v-else
+            class="highlight-manager-placeholder"
+            aria-hidden="true"
+          >
+            <ImagePlus :size="20" />
+          </span>
+          <span class="highlight-manager-item-copy">
+            <strong>{{ collection.title }}</strong>
+            <small>{{ collection.items.length }} {{ t('Photos') }} · {{ (collection.articleHighlights || []).length }} {{ t('Saved quotes') }}</small>
+          </span>
+          <ChevronRight
+            :size="18"
+            aria-hidden="true"
+          />
+        </button>
+      </div>
+      <p
+        v-else
+        class="empty-state highlight-manager-empty"
+      >
+        {{ t('No highlights yet') }}
+      </p>
+    </section>
+  </div>
+
+  <div
+    v-if="highlightManagerView === 'editor' && highlightDraft"
+    class="dialog-backdrop"
+    @click.self="closeHighlightManager"
+  >
+    <section
+      class="app-dialog surface-card highlight-editor-dialog"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="highlight-editor-title"
+    >
+      <div class="highlight-editor-heading">
+        <button
+          class="icon-button"
+          type="button"
+          :aria-label="t('Back to highlights')"
+          :disabled="highlightPhotosLoading"
+          @click="returnToHighlightList"
+        >
+          <ChevronLeft :size="19" />
+        </button>
+        <h2 id="highlight-editor-title">
+          {{ t('Edit highlight collection') }}
+        </h2>
+        <button
+          class="icon-button"
+          type="button"
+          :aria-label="t('Close dialog')"
+          :disabled="highlightPhotosLoading"
+          @click="closeHighlightManager"
+        >
+          <X :size="18" />
+        </button>
+      </div>
+      <div class="highlight-cover-field">
+        <strong>{{ t('Cover') }}</strong>
+        <img
+          v-if="highlightDraft.items[0]?.src"
+          class="highlight-editor-cover"
+          :src="highlightDraft.items[0].src"
+          :alt="highlightDraft.items[0].name || t('Highlight image')"
+        >
+        <button
+          v-else
+          class="highlight-editor-cover highlight-editor-cover-empty"
+          type="button"
+          :disabled="highlightPhotosLoading"
+          @click="highlightImageInput?.click()"
+        >
+          <ImagePlus :size="20" />
+          {{ t('Add photos') }}
+        </button>
+      </div>
+      <label class="highlight-title-field">
+        <span>{{ t('Title') }}</span>
+        <input
+          v-model="highlightDraft.title"
+          type="text"
+          maxlength="80"
+          :placeholder="t('Highlight title')"
+          :disabled="highlightPhotosLoading"
+        >
+      </label>
+      <div class="highlight-photo-heading">
+        <strong>{{ t('Photos') }} ({{ highlightDraft.items.length }}/8)</strong>
+        <button
+          class="button button-secondary"
+          type="button"
+          :disabled="highlightPhotosLoading || highlightDraft.items.length >= 8"
+          @click="highlightImageInput?.click()"
+        >
+          <Plus :size="16" /> {{ t('Add more') }}
+        </button>
+      </div>
+      <div
+        v-if="highlightDraft.items.length"
+        class="highlight-editor-photos"
+      >
+        <div
+          v-for="image in highlightDraft.items"
+          :key="image.id"
+          class="highlight-editor-photo"
+        >
+          <img
+            :src="image.src"
+            :alt="image.name || t('Highlight image')"
+          >
+          <button
+            class="icon-button"
+            type="button"
+            :aria-label="`${t('Remove image')}: ${image.name || t('Highlight image')}`"
+            :disabled="highlightPhotosLoading"
+            @click="removeHighlightPhoto(image.id)"
+          >
+            <X :size="16" />
+          </button>
+        </div>
+      </div>
+      <p
+        v-if="highlightPhotosLoading"
+        class="highlight-photo-loading"
+        role="status"
+      >
+        <LoadingDots /> {{ t('Reading photos...') }}
+      </p>
+      <input
+        ref="highlightImageInput"
+        class="visually-hidden"
+        type="file"
+        accept="image/png,image/jpeg,image/gif,image/webp"
+        multiple
+        @change="handleHighlightPhotos"
+      >
+      <div class="dialog-actions">
+        <button
+          class="button button-secondary"
+          type="button"
+          :disabled="highlightPhotosLoading"
+          @click="returnToHighlightList"
+        >
+          {{ t('Cancel') }}
+        </button>
+        <button
+          class="button button-primary"
+          type="button"
+          :disabled="highlightPhotosLoading || !highlightDraft.title.trim() || (!highlightDraft.items.length && !highlightDraft.articleHighlights.length)"
+          @click="saveHighlightCollection"
+        >
+          {{ t('Save') }}
+        </button>
+      </div>
     </section>
   </div>
 

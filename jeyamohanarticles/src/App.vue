@@ -315,6 +315,17 @@ onUnmounted(() => {
       <GoogleAiSearch
         class="desktop-google-search"
         :label="t('Search Google AI')"
+        :error-label="t('Could not open all 3 AI tabs or copy your text. Allow pop-ups and clipboard access, then try again.')"
+        :loading-label="t('Opening 3 AIs...')"
+        :single-loading-label="t('Opening AI...')"
+        :success-label="t('Copied to clipboard and opened all 3 AI tabs. Paste in each tab.')"
+        :single-success-label="t('Copied your prompt and opened {provider}. Paste it there.')"
+        :single-error-label="t('Could not open the AI or copy your prompt. Allow pop-ups and clipboard access, then try again.')"
+        :picker-title="t('Which AI would you like to use?')"
+        :picker-description="t('Choose one AI to open. Your prompt will be copied for you.')"
+        :cancel-label="t('Cancel')"
+        :submit-label="t('Search 3 AIs')"
+        :mobile-submit-label="t('Choose an AI')"
       />
       <div class="header-tools">
         <span class="header-greeting">{{ profileName }}</span>
@@ -568,6 +579,17 @@ onUnmounted(() => {
           v-if="route.name === 'compose'"
           class="mobile-home-search"
           :label="t('Search Google AI')"
+          :error-label="t('Could not open all 3 AI tabs or copy your text. Allow pop-ups and clipboard access, then try again.')"
+          :loading-label="t('Opening 3 AIs...')"
+          :single-loading-label="t('Opening AI...')"
+          :success-label="t('Copied to clipboard and opened all 3 AI tabs. Paste in each tab.')"
+          :single-success-label="t('Copied your prompt and opened {provider}. Paste it there.')"
+          :single-error-label="t('Could not open the AI or copy your prompt. Allow pop-ups and clipboard access, then try again.')"
+          :picker-title="t('Which AI would you like to use?')"
+          :picker-description="t('Choose one AI to open. Your prompt will be copied for you.')"
+          :cancel-label="t('Cancel')"
+          :submit-label="t('Search 3 AIs')"
+          :mobile-submit-label="t('Choose an AI')"
         />
         <div
           v-if="route.name !== 'compose'"

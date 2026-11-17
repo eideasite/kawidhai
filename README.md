@@ -1,5 +1,5 @@
-# unaku songs illa
+# Can I Write
 
-Live site: https://eideasite.github.io/onetwo/
+A personal writing workspace built with Vue 3 and Vite.
 
-GitHub Pages deploys automatically when changes are pushed to `main`.
+See [the app README](./jeyamohanarticles/README.md) for setup instructions and feature details.

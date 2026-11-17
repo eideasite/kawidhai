@@ -12,6 +12,7 @@ Last updated: 2026-11-16
 - Network quality colors are inferred from browser estimates or the manual download test: under 1 Mbps weak/blue, 1-<5 okay/red, 5-<25 good/yellow, and 25+ fast/green. Tapping the indicator opens details; the border animates while details are open or a test runs.
 - On mobile, the network strip is now a compact single row (about 35 px tall); the measured Mbps result appears in a quality-colored badge beside the brand in the header.
 - On the Home route, Google AI search moves below the network strip and above the Home heading on mobile; desktop keeps the search in the header. Mobile Highlights appear after the composer and before Recent Posts; desktop order is unchanged.
+- Submitting an AI prompt on mobile (including Enter) asks the user to choose Gemini, ChatGPT, or Meta AI, then copies the exact prompt and opens that provider; desktop continues to open all three.
 - The default profile display name is `Jeyamohan`. Only exact known legacy default names (including the garbled stored value) are normalized during workspace load; other profile names remain unchanged.
 - Mobile non-Home routes show a back arrow beside the hamburger. It returns through Vue Router history, and replaces the route with Home when no in-app history exists. Permission prompts are not requested globally; browser permissions must be user-approved in response to a specific feature action.
 - Vue state and debounced persistence are centralized in `src/stores/workspace.js`.
@@ -26,8 +27,17 @@ Last updated: 2026-11-16
 - The compact network strip and header speed badge were verified in the mobile browser: strip height decreased from about 60 px to 35 px, the speed test showed a quality-colored Mbps badge, and no content extended beyond the viewport at tested mobile widths.
 - Mobile/desktop layout checks confirmed the Google AI search and Highlights are in the intended responsive positions at 375 px and desktop width; browser storage now shows the migrated profile name `Jeyamohan`.
 - Mobile back navigation was browser-tested from Profile to Home; the menu remains available and the back control is hidden on Home. Build passes and targeted ESLint reports 0 errors (8 existing Vue style warnings).
-- The Vite dev server is running at `http://127.0.0.1:5173/` as requested.
-- The Vite dev server is stopped; the shared browser is back on `http://127.0.0.1:5173/#/compose`.
+- The dev server was started at `http://127.0.0.1:5173/` and later recorded as stopped; confirm its current state before assuming it is running.
+
+## GitHub Pages Deployment
+
+- The target repository is `eideasite/onetwo`, branch `main`; the app is nested under `jeyamohanarticles`.
+- `.github/workflows/deploy-pages.yml` builds with `--base=/onetwo/`, runs lint, uploads the `dist` artifact, and deploys to GitHub Pages. It runs on relevant pushes to `main` and supports manual dispatch.
+- The root README links to `https://eideasite.github.io/onetwo/`.
+- The latest `onetwo/main` commit is `d27d8c8` (`Enable GitHub Pages for the repository`); the local branch is `feature/article-improvements`, four commits ahead of `origin/feature/article-improvements`.
+- The latest confirmed workflow run (#2, for `d27d8c8`) failed in `actions/configure-pages` with `Resource not accessible by integration` while trying to create the Pages site. Earlier lint and a Pages-base production build passed.
+- The user later reported selecting GitHub Actions as the Pages source, but that setting and a successful deployment were not independently verified. The published URL returned 404 before that report; deployment still needs a rerun and URL check.
+- Next step: rerun `Deploy to GitHub Pages` from the repository Actions page (or use its `workflow_dispatch` trigger), then verify the site URL. Do not claim it is live until the workflow succeeds and the URL loads.
 
 ## Next Work (User Will Provide Changes One at a Time)
 
