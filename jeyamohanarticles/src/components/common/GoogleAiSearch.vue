@@ -3,7 +3,7 @@ import { onMounted, onUnmounted, ref } from 'vue'
 import { Search } from 'lucide-vue-next'
 import LoadingDots from './LoadingDots.vue'
 import AiProviderPicker from './AiProviderPicker.vue'
-import { AI_PROVIDERS, openAiProviderTabs } from '../../services/aiSearch.js'
+import { AI_PROVIDERS, aiSearchQuery, openAiProviderTabs } from '../../services/aiSearch.js'
 
 defineOptions({ inheritAttrs: false })
 
@@ -58,7 +58,7 @@ const props = defineProps({
   },
 })
 
-const query = ref('')
+const query = aiSearchQuery
 const searching = ref(false)
 const searchingSingle = ref(false)
 const searchError = ref('')

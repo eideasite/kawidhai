@@ -5,6 +5,7 @@ import {
   Archive,
   Bookmark,
   ChevronLeft,
+  Download,
   FileText,
   House,
   Info,
@@ -20,6 +21,7 @@ import {
 } from 'lucide-vue-next'
 import { useWorkspace } from './stores/workspace.js'
 import { getWorkspaceRecoveryData } from './services/articleStorage.js'
+import { requestPersistentBrowserStorage } from './services/browserStorage.js'
 import { runNetworkSpeedTest } from './services/networkSpeedTest.js'
 import { translate } from './i18n.js'
 import GoogleAiSearch from './components/common/GoogleAiSearch.vue'
@@ -36,6 +38,7 @@ const errorNotice = ref(null)
 const clock = ref('')
 const online = ref(navigator.onLine)
 const networkTest = ref(null)
+const browserStorageStatus = ref('checking')
 const connectionInfo = ref(readConnectionInfo())
 let clockTimer
 let noticeTimer
@@ -48,12 +51,23 @@ const navItems = [
   { name: 'articles', label: 'Articles Management', icon: FileText },
   { name: 'bookmarks', label: 'Bookmarks', icon: Bookmark },
   { name: 'archive', label: 'Archive', icon: Archive },
+  { name: 'backup', label: 'Backup and restore', icon: Download },
   { name: 'profile', label: 'Profile', icon: Settings },
 ]
 const pageTitle = computed(() => translate(route.meta.title || 'Jeyamohan Articles', language.value))
 const profileName = computed(() => workspace.value.profile.name || 'Jeyamohan')
 const t = (text) => translate(text, language.value)
 const pendingSyncCount = computed(() => posts.value.filter((post) => post.syncStatus === 'pending').length)
+const browserStorageStatusLabel = computed(() => ({
+  checking: 'Checking storage protection',
+  persistent: 'Protected from automatic cleanup',
+  'best-effort': 'May be cleared by browser',
+  unsupported: 'Browser cleanup protection unavailable',
+  unavailable: 'Could not check storage protection',
+}[browserStorageStatus.value]))
+const browserStorageStatusDescription = computed(() => browserStorageStatus.value === 'persistent'
+  ? 'Persistent storage is enabled. Clearing site data, uninstalling the browser, or losing this device can still remove these files.'
+  : 'Data is saved on this browser and device. Browser cleanup, clearing site data, uninstalling the browser, or losing this device can remove it.')
 const networkQuality = computed(() => {
   if (!online.value) return 'offline'
   const speed = networkTest.value?.status === 'success'
@@ -202,6 +216,9 @@ function downloadRecoveryCopy() {
 }
 
 onMounted(() => {
+  requestPersistentBrowserStorage().then((status) => {
+    browserStorageStatus.value = status
+  })
   updateClock()
   clockTimer = window.setInterval(updateClock, 30000)
   window.addEventListener('online', onOnlineChange)
@@ -416,7 +433,13 @@ onUnmounted(() => {
       >
         {{ networkTest?.status === 'running' ? 'Testing…' : t('Run speed test') }}
       </button>
-      <span class="status-save">{{ t(saveStatus === 'saving' ? 'Saving draft...' : saveStatus === 'saved' ? 'Saved in this browser' : saveStatus === 'conflict' ? 'Another tab changed this workspace.' : 'Could not save') }}</span>
+      <span
+        class="status-save"
+        :title="t(browserStorageStatusDescription)"
+      >
+        <span>{{ t(saveStatus === 'saving' ? 'Saving draft...' : saveStatus === 'saved' ? 'Saved in this browser' : saveStatus === 'conflict' ? 'Another tab changed this workspace.' : 'Could not save') }}</span>
+        <span aria-live="polite">· {{ t(browserStorageStatusLabel) }}</span>
+      </span>
     </div>
 
     <section

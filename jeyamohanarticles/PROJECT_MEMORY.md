@@ -1,12 +1,18 @@
 # Project Memory
 
-Last updated: 2026-11-16
+Last updated: 2026-11-17
 
 ## App
 
 - Jeyamohan Articles is a Vue 3 + Vite single-page writing workspace using Vue Router and Lucide Vue icons.
 - Browser storage formats and keys remain in `src/services`; the React UI, React dependencies, and Ant Design React have been removed.
-- Articles, bookmarks, Home Shortcuts, highlights, profile preferences, and local publish/schedule states remain in `localStorage`; posts and images use IndexedDB with legacy `localStorage` migration/fallback. There is no backend.
+- Articles, bookmarks, Home Shortcuts, highlights, profile preferences, and local publish/schedule states remain in `localStorage`; posts and images use IndexedDB with legacy `localStorage` migration/fallback. The app requests persistent browser storage on startup where supported, but browser/site-data resets and device loss can still erase local data. There is no backend or cross-device sync.
+- Article edits and profile fields save synchronously to localStorage as they change; unfinished post text is written to a dedicated localStorage draft key on every keystroke and restored when opening the post composer after refresh.
+- Profile settings display the browser-reported storage usage, quota, and estimated remaining capacity; the estimate is origin-wide/browser-controlled, not a guaranteed 3,487 MB allocation.
+- The Backup route exports local articles, posts/images, highlights, bookmarks, drafts, and preferences as date-organized ZIP parts capped below 387,000,000 bytes. Restore merges new IDs and keeps existing content/preferences; individual TXT and PNG/JPEG/GIF/WebP files import as Home posts. Multi-selected posts can be downloaded as date-organized ZIP archives. Google Drive upload remains manual; the app has no backend.
+- Article Editor focus mode hides navigation/status chrome, expands the editor, and persists its state in the browser. The current development browser is left with focus mode enabled.
+- Action groups place secondary actions left and main actions right (for groups with four or more, the last two are right-aligned); notifications appear centered near the top. Post creation uses a 3-second preparation phase, at least 1 second for local save, then confirms around 5 seconds from submission after success.
+- Google AI search text is shared between desktop/mobile search bars and autosaved locally until copy/open succeeds. Provider pages are cross-origin; prompt entry/submission remains a user action there.
 - Posts created offline are saved on-device and marked sync-pending. No remote upload or automatic retry is attempted until an upload service is configured.
 - The network indicator uses browser connection estimates and explicit speed-test results; browser APIs cannot read a device's cellular signal bars.
 - Network quality colors are inferred from browser estimates or the manual download test: under 1 Mbps weak/blue, 1-<5 okay/red, 5-<25 good/yellow, and 25+ fast/green. Tapping the indicator opens details; the border animates while details are open or a test runs.
@@ -20,12 +26,13 @@ Last updated: 2026-11-16
 
 ## Verification
 
-- `npm.cmd run lint` exits successfully with 0 errors and 55 Vue style warnings.
-- `npm.cmd run build` passes.
+- `npm.cmd run lint`, `npm.cmd test`, and `npm.cmd run build` pass after the backup feature changes.
 - Browser smoke check covered article creation, autosave to the existing workspace key, local publishing, and responsive widths from 320 px to desktop; smoke-test storage was restored afterward.
 - Network status panel, quality color, animated border, and mobile overflow were checked. Offline post smoke check confirmed an IndexedDB post persisted through reload and stayed marked sync-pending; temporary test data was restored.
 - The compact network strip and header speed badge were verified in the mobile browser: strip height decreased from about 60 px to 35 px, the speed test showed a quality-colored Mbps badge, and no content extended beyond the viewport at tested mobile widths.
 - Mobile/desktop layout checks confirmed the Google AI search and Highlights are in the intended responsive positions at 375 px and desktop width; browser storage now shows the migrated profile name `Jeyamohan`.
+- Backup route browser smoke checks confirmed ZIP download initiation, TXT import into the Home post feed, and no horizontal overflow at 375 px. A temporary imported test post was removed afterward.
+- Focus mode browser check confirmed navigation/header hiding, an available exit control, and persistence after page refresh.
 - Mobile back navigation was browser-tested from Profile to Home; the menu remains available and the back control is hidden on Home. Build passes and targeted ESLint reports 0 errors (8 existing Vue style warnings).
 - The dev server was started at `http://127.0.0.1:5173/` and later recorded as stopped; confirm its current state before assuming it is running.
 
@@ -44,4 +51,5 @@ Last updated: 2026-11-16
 - Likely follow-ups from the user's backlog: date-grouped `/posts` grid/list view, date-wise TXT/JSON exports, post-copy action, mobile navigation/search polish, accessibility duplicate cleanup, and durable composer drafts.
 - Do not implement the entire backlog at once; take the next requested item, clarify scope when needed, and preserve the dirty worktree.
 - Google Drive/Gmail sync and a 3 GB cloud quota need a real backend and Google OAuth configuration; none is configured. Do not claim cloud upload or automatic retry.
+- The Backup page surfaces a warning when browser-reported storage reaches 85% of quota; browser estimates are not exact and cannot guarantee a successful write.
 - A webpage cannot configure OpenDNS or device DNS. A hard-coded default password such as `1234` is not safe for a real login.

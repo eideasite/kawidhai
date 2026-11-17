@@ -1,4 +1,32 @@
+import { ref, watch } from 'vue'
+import { notifyAppError } from './errorNotifications.js'
+
 const AI_SEARCH_DELAY_MS = 3000
+const AI_SEARCH_QUERY_KEY = 'jeyamohan-ai-search-query-v1'
+
+function loadSavedAiSearchQuery() {
+  try {
+    return localStorage.getItem(AI_SEARCH_QUERY_KEY) || ''
+  } catch {
+    return ''
+  }
+}
+
+export const aiSearchQuery = ref(loadSavedAiSearchQuery())
+let aiSearchDraftSaveErrorNotified = false
+
+watch(aiSearchQuery, (query) => {
+  try {
+    if (query) localStorage.setItem(AI_SEARCH_QUERY_KEY, query)
+    else localStorage.removeItem(AI_SEARCH_QUERY_KEY)
+    aiSearchDraftSaveErrorNotified = false
+  } catch {
+    if (!aiSearchDraftSaveErrorNotified) {
+      notifyAppError('Could not save your AI search draft in this browser.')
+      aiSearchDraftSaveErrorNotified = true
+    }
+  }
+}, { flush: 'sync' })
 
 export const AI_PROVIDERS = [
   { name: 'Google Gemini', url: 'https://gemini.google.com/' },

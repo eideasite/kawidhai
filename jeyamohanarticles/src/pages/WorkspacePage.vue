@@ -12,6 +12,8 @@ import {
   Copy,
   ExternalLink,
   FilePlus2,
+  Maximize2,
+  Minimize2,
   House,
   ImagePlus,
   Mic,
@@ -29,6 +31,8 @@ import { useWorkspace } from '../stores/workspace.js'
 import { articleCanPublish } from '../utils/validation.js'
 import { createId } from '../utils/createId.js'
 import { createArticleHighlight, createHighlightCollection } from '../services/highlightStorage.js'
+import { loadPostDraft, savePostDraft } from '../services/postStorage.js'
+import { estimateBrowserStorage } from '../services/browserStorage.js'
 import { formatDate } from '../utils/formatDate.js'
 import { getArticleExcerpt, getArticleTitle, getWordCount } from '../utils/article.js'
 import { richTextToHtml, richTextToPlainText, sanitizeRichTextHtml } from '../utils/richText.js'
@@ -61,9 +65,20 @@ const {
   setSessionStatus,
 } = useWorkspace()
 
-const postText = ref('')
+const postDraftStorageError = ref(false)
+let initialPostDraft = ''
+try {
+  initialPostDraft = loadPostDraft()
+} catch {
+  postDraftStorageError.value = true
+}
+const postText = ref(initialPostDraft)
+watch(postText, (text) => {
+  postDraftStorageError.value = !savePostDraft(text)
+}, { flush: 'sync' })
 const postImage = ref(null)
 const postSaving = ref(false)
+const postPhase = ref('idle')
 const postDialogOpen = ref(false)
 const postTextArea = ref(null)
 const emojiPickerOpen = ref(false)
@@ -82,6 +97,13 @@ const highlightDraft = ref(null)
 const highlightImageInput = ref(null)
 const highlightPhotosLoading = ref(false)
 const profileForm = ref({ ...workspace.value.profile })
+watch(profileForm, (profile) => {
+  const currentProfile = workspace.value.profile
+  if (profile.name === currentProfile.name
+    && profile.bio === currentProfile.bio
+    && profile.avatar === currentProfile.avatar) return
+  workspace.value.profile = { ...profile }
+}, { deep: true, flush: 'sync' })
 const externalAiPrompt = ref('')
 const externalAiPromptSearching = ref(false)
 const externalAiPromptStorageError = ref(false)
@@ -121,6 +143,13 @@ try {
 }
 
 const page = computed(() => String(route.name || 'not-found'))
+const FOCUS_MODE_STORAGE_KEY = 'jeyamohan-focus-mode-v1'
+const focusMode = ref(false)
+try {
+  focusMode.value = localStorage.getItem(FOCUS_MODE_STORAGE_KEY) === 'enabled'
+} catch {
+  focusMode.value = false
+}
 const currentArticle = computed(() => {
   const requestedId = typeof route.query.article === 'string' ? route.query.article : ''
   return workspace.value.articles.find((article) => article.id === requestedId)
@@ -155,10 +184,29 @@ const wordCount = computed(() => getWordCount(currentArticle.value?.body || ''))
 const dateLocale = computed(() => language.value === 'ta' ? 'ta-IN' : 'en-GB')
 const t = (text) => translate(text, language.value)
 const profileName = computed(() => workspace.value.profile.name || 'Jeyamohan')
+const browserStorageEstimate = ref({ status: 'idle', usage: 0, quota: 0 })
+const browserStorageUsageRatio = computed(() => browserStorageEstimate.value.quota
+  ? Math.min(1, browserStorageEstimate.value.usage / browserStorageEstimate.value.quota)
+  : 0)
 const composerPlaceholder = computed(() => t("What's on your mind, {name}?").replace('{name}', profileName.value))
 const formattedBody = computed(() => richTextToHtml(currentArticle.value?.body || ''))
 const selectedArticle = computed(() => workspace.value.articles.find((article) => article.id === dialog.value?.articleId) || currentArticle.value)
 const highlightedCollection = computed(() => highlights.value.find((item) => item.id === selectedCollectionId.value))
+
+function formatStorageSize(bytes) {
+  const megabytes = bytes / (1024 * 1024)
+  return megabytes >= 1024 ? `${(megabytes / 1024).toFixed(2)} GB` : `${megabytes.toFixed(0)} MB`
+}
+
+async function refreshBrowserStorageEstimate() {
+  browserStorageEstimate.value = { ...browserStorageEstimate.value, status: 'loading' }
+  try {
+    const estimate = await estimateBrowserStorage()
+    browserStorageEstimate.value = { status: 'ready', ...estimate }
+  } catch {
+    browserStorageEstimate.value = { status: 'unavailable', usage: 0, quota: 0 }
+  }
+}
 
 watch(accessibility, (settings) => {
   document.documentElement.style.setProperty('--app-font-scale', String(settings.fontScale))
@@ -178,6 +226,27 @@ function showMessage(text) {
   messageTimer.value = window.setTimeout(() => { message.value = '' }, 3500)
 }
 
+function updateFocusModePageClass() {
+  document.documentElement.classList.toggle(
+    'writing-focus-mode',
+    page.value === 'editor' && focusMode.value,
+  )
+}
+
+watch(focusMode, (enabled) => {
+  try {
+    localStorage.setItem(FOCUS_MODE_STORAGE_KEY, enabled ? 'enabled' : 'disabled')
+  } catch {
+    showMessage(t('Focus mode preference could not be saved in this browser.'))
+  }
+  updateFocusModePageClass()
+}, { flush: 'sync' })
+
+watch(page, (currentPage) => {
+  if (currentPage === 'profile') refreshBrowserStorageEstimate()
+  updateFocusModePageClass()
+}, { immediate: true })
+
 function updateMobileViewport() {
   mobileViewport.value = mobileViewportQuery.matches
 }
@@ -195,7 +264,7 @@ watch(externalAiPrompt, (prompt) => {
   } catch {
     externalAiPromptStorageError.value = true
   }
-})
+}, { flush: 'sync' })
 
 function handleExternalAiPromptKeydown(event) {
   if (event.key !== 'Enter' || event.shiftKey || event.isComposing || !externalAiPrompt.value.trim()) return
@@ -390,9 +459,12 @@ async function submitPost() {
   const submittedText = postText.value
   const submittedImage = postImage.value
   const savedOffline = !navigator.onLine
+  const startedAt = performance.now()
   postSaving.value = true
+  postPhase.value = 'loading'
   try {
     await new Promise((resolve) => window.setTimeout(resolve, 3000))
+    postPhase.value = 'saving'
     if (!await createPost({
       text: submittedText,
       image: submittedImage,
@@ -401,12 +473,21 @@ async function submitPost() {
       showMessage('Could not save this post in this browser.')
       return
     }
+    const savePhaseRemaining = 4000 - (performance.now() - startedAt)
+    if (savePhaseRemaining > 0) {
+      await new Promise((resolve) => window.setTimeout(resolve, savePhaseRemaining))
+    }
     if (postText.value === submittedText) postText.value = ''
     if (postImage.value === submittedImage) postImage.value = null
     postDialogOpen.value = false
+    const notificationRemaining = 5000 - (performance.now() - startedAt)
+    if (notificationRemaining > 0) {
+      await new Promise((resolve) => window.setTimeout(resolve, notificationRemaining))
+    }
     showMessage(savedOffline ? 'Post saved offline. Sync is pending until an upload service is connected.' : 'Post saved in this browser.')
   } finally {
     postSaving.value = false
+    postPhase.value = 'idle'
   }
 }
 
@@ -726,6 +807,7 @@ onBeforeUnmount(() => {
   window.clearTimeout(messageTimer.value)
   recognition.value?.stop()
   mobileViewportQuery.removeEventListener('change', updateMobileViewport)
+  document.documentElement.classList.remove('writing-focus-mode')
 })
 </script>
 
@@ -745,7 +827,6 @@ onBeforeUnmount(() => {
         <ChevronRight :size="18" />
       </button>
     </section>
-
     <section
       class="composer-card surface-card"
       :aria-label="t('Create post')"
@@ -1077,20 +1158,88 @@ onBeforeUnmount(() => {
         </button>
       </div>
     </section>
+    <section class="surface-card settings-card browser-storage-card">
+      <div class="browser-storage-heading">
+        <div>
+          <h2>{{ t('Browser storage') }}</h2>
+          <p>{{ t('Estimated storage for this site on this device. The browser controls the quota.') }}</p>
+        </div>
+        <button
+          class="button button-secondary"
+          type="button"
+          :disabled="browserStorageEstimate.status === 'loading'"
+          @click="refreshBrowserStorageEstimate"
+        >
+          {{ t(browserStorageEstimate.status === 'loading' ? 'Checking...' : 'Refresh estimate') }}
+        </button>
+      </div>
+      <div
+        v-if="browserStorageEstimate.status === 'ready'"
+        class="browser-storage-metrics"
+      >
+        <div><small>{{ t('Used') }}</small><strong>{{ formatStorageSize(browserStorageEstimate.usage) }}</strong></div>
+        <div><small>{{ t('Estimated available') }}</small><strong>{{ formatStorageSize(Math.max(0, browserStorageEstimate.quota - browserStorageEstimate.usage)) }}</strong></div>
+        <div><small>{{ t('Estimated quota') }}</small><strong>{{ formatStorageSize(browserStorageEstimate.quota) }}</strong></div>
+        <progress
+          class="browser-storage-progress"
+          max="1"
+          :value="browserStorageUsageRatio"
+          :aria-label="t('Estimated browser storage used')"
+        />
+      </div>
+      <p
+        v-else-if="browserStorageEstimate.status === 'unavailable'"
+        class="browser-storage-unavailable"
+        role="status"
+      >
+        {{ t('This browser does not provide a storage estimate.') }}
+      </p>
+    </section>
   </div>
 
   <div
     v-else-if="page === 'editor'"
     class="page-wrap editor-page"
+    :class="{ 'is-focused': focusMode }"
   >
     <div class="page-heading page-heading-row">
-      <div><span class="eyebrow">{{ t('Writing workspace') }}</span><h1>{{ t('Article Editor') }}</h1><p>{{ t('Write and edit your article. Your draft is saved in this browser.') }}</p></div><button
-        class="button button-secondary"
-        type="button"
-        @click="go('articles')"
-      >
-        {{ t('Manage') }} {{ t('Articles') }}
-      </button>
+      <div class="editor-heading-copy">
+        <span class="eyebrow">{{ t('Writing workspace') }}</span>
+        <h1>{{ t('Article Editor') }}</h1>
+        <p>{{ t('Write and edit your article. Your draft is saved in this browser.') }}</p>
+      </div>
+      <div class="editor-heading-actions">
+        <button
+          class="button button-secondary editor-manage-button"
+          type="button"
+          @click="go('articles')"
+        >
+          {{ t('Manage') }} {{ t('Articles') }}
+        </button>
+        <button
+          class="button button-secondary focus-mode-toggle"
+          :class="{ 'is-active': focusMode }"
+          type="button"
+          :aria-pressed="focusMode"
+          :aria-label="t(focusMode ? 'Exit focus mode' : 'Focus mode')"
+          @click="focusMode = !focusMode"
+        >
+          <Minimize2
+            v-if="focusMode"
+            :size="17"
+          />
+          <Maximize2
+            v-else
+            :size="17"
+          />
+          <span>{{ t(focusMode ? 'Exit focus mode' : 'Focus mode') }}</span>
+          <span
+            v-if="focusMode"
+            class="focus-mode-indicator"
+            aria-hidden="true"
+          />
+        </button>
+      </div>
     </div>
     <template v-if="currentArticle">
       <section class="surface-card editor-card">
@@ -1160,48 +1309,52 @@ onBeforeUnmount(() => {
           @input="commitBody"
         />
         <div class="editor-actions">
-          <button
-            class="button button-secondary"
-            type="button"
-            @click="openDialog('preview')"
-          >
-            Preview
-          </button>
-          <button
-            class="button button-secondary"
-            type="button"
-            @click="go('seo', currentArticle.id)"
-          >
-            SEO settings
-          </button>
-          <button
-            class="button button-secondary"
-            type="button"
-            @click="copyArticle(currentArticle)"
-          >
-            <Copy :size="16" /> Copy
-          </button>
-          <button
-            class="button button-secondary"
-            type="button"
-            @click="downloadArticle(currentArticle)"
-          >
-            Download .txt
-          </button>
-          <button
-            class="button button-secondary"
-            type="button"
-            @click="changePost(currentArticle.id, 'schedule')"
-          >
-            <Clock3 :size="16" /> Schedule
-          </button>
-          <button
-            class="button button-primary"
-            type="button"
-            @click="changePost(currentArticle.id, 'publish')"
-          >
-            <Send :size="16" /> Publish locally
-          </button>
+          <div class="editor-action-group editor-action-secondary">
+            <button
+              class="button button-secondary"
+              type="button"
+              @click="openDialog('preview')"
+            >
+              Preview
+            </button>
+            <button
+              class="button button-secondary"
+              type="button"
+              @click="go('seo', currentArticle.id)"
+            >
+              SEO settings
+            </button>
+            <button
+              class="button button-secondary"
+              type="button"
+              @click="copyArticle(currentArticle)"
+            >
+              <Copy :size="16" /> Copy
+            </button>
+            <button
+              class="button button-secondary"
+              type="button"
+              @click="downloadArticle(currentArticle)"
+            >
+              Download .txt
+            </button>
+          </div>
+          <div class="editor-action-group editor-action-primary">
+            <button
+              class="button button-secondary"
+              type="button"
+              @click="changePost(currentArticle.id, 'schedule')"
+            >
+              <Clock3 :size="16" /> Schedule
+            </button>
+            <button
+              class="button button-primary"
+              type="button"
+              @click="changePost(currentArticle.id, 'publish')"
+            >
+              <Send :size="16" /> Publish locally
+            </button>
+          </div>
         </div>
         <div class="highlight-tools">
           <h2>Save a highlight</h2>
@@ -1661,6 +1814,20 @@ onBeforeUnmount(() => {
         :aria-label="t('Write your post')"
         :disabled="postSaving"
       />
+      <p
+        v-if="postDraftStorageError"
+        class="post-local-note"
+        role="alert"
+      >
+        {{ t('Could not save your post draft in this browser.') }}
+      </p>
+      <p
+        v-else
+        class="post-local-note"
+        aria-live="polite"
+      >
+        {{ t('Your post draft is saved as you type.') }}
+      </p>
       <div
         v-if="postImage"
         class="selected-image post-modal-image"
@@ -1686,7 +1853,7 @@ onBeforeUnmount(() => {
         aria-live="polite"
       >
         <LoadingDots />
-        <span>{{ t('Posting...') }}</span>
+        <span>{{ t(postPhase === 'loading' ? 'Loading post...' : 'Saving post...') }}</span>
       </div>
       <div class="post-add-toolbar">
         <strong>{{ t('Add to your post') }}</strong>

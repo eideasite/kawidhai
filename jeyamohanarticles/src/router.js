@@ -1,5 +1,6 @@
 import { createRouter, createWebHashHistory } from 'vue-router'
 import WorkspacePage from './pages/WorkspacePage.vue'
+import BackupPage from './pages/BackupPage.vue'
 
 const routes = [
   { path: '/', redirect: '/compose' },
@@ -11,6 +12,7 @@ const routes = [
   { path: '/articles', name: 'articles', component: WorkspacePage, meta: { title: 'Articles' } },
   { path: '/bookmarks', name: 'bookmarks', component: WorkspacePage, meta: { title: 'Bookmarks' } },
   { path: '/archive', name: 'archive', component: WorkspacePage, meta: { title: 'Archive' } },
+  { path: '/backup', name: 'backup', component: BackupPage, meta: { title: 'Backup and restore' } },
   { path: '/external-ai-tools', name: 'external-ai-tools', component: WorkspacePage, meta: { title: 'External AI tools' } },
   { path: '/:pathMatch(.*)*', name: 'not-found', component: WorkspacePage, meta: { title: 'Not found' } },
 ]

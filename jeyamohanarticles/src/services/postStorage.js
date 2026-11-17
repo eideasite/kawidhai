@@ -5,6 +5,7 @@ const POSTS_DATABASE = 'jeyamohan-local-posts-v1'
 const POSTS_DATABASE_VERSION = 1
 const POSTS_STORE = 'snapshots'
 const POSTS_SNAPSHOT_ID = 'all-posts'
+const POST_DRAFT_KEY = 'jeyamohan-post-draft-v1'
 let databasePromise
 
 function normalizePosts(value) {
@@ -72,6 +73,21 @@ export function loadPosts() {
     return normalizePosts(value)
   } catch {
     return []
+  }
+}
+
+export function loadPostDraft() {
+  return localStorage.getItem(POST_DRAFT_KEY) || ''
+}
+
+export function savePostDraft(text) {
+  if (typeof text !== 'string') return false
+  try {
+    if (text) localStorage.setItem(POST_DRAFT_KEY, text)
+    else localStorage.removeItem(POST_DRAFT_KEY)
+    return true
+  } catch {
+    return false
   }
 }
 
